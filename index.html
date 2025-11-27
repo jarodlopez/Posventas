@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Sistema de Ventas</title>
+    <!-- Tailwind CSS (Diseño rápido) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Iconos -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Estilos Propios -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 text-gray-900 font-sans overflow-hidden">
+
+    <!-- 1. PANTALLA DE LOGIN (Se muestra si no hay usuario) -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold text-center mb-6 text-indigo-600">POS Login</h2>
+            
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="login-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" id="login-pass" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-bold">Entrar</button>
+            </form>
+
+            <div class="mt-4 text-center border-t pt-4">
+                <p class="text-sm text-gray-500">¿No tienes cuenta?</p>
+                <button id="show-register-btn" class="text-indigo-600 font-medium text-sm">Registrar nuevo usuario</button>
+            </div>
+
+            <!-- Formulario Registro (Oculto por defecto) -->
+            <form id="register-form" class="space-y-4 mt-4 hidden">
+                <h3 class="text-lg font-bold">Crear Usuario</h3>
+                <input type="email" id="reg-email" placeholder="Email" class="w-full border p-2 rounded" required>
+                <input type="password" id="reg-pass" placeholder="Contraseña" class="w-full border p-2 rounded" required>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Registrar</button>
+                <button type="button" id="cancel-reg-btn" class="w-full text-gray-500 text-sm mt-2">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. APLICACIÓN PRINCIPAL (Se muestra al loguear) -->
+    <div id="app-screen" class="flex h-screen hidden">
+        
+        <!-- Sidebar Menú -->
+        <nav class="w-20 bg-gray-900 flex flex-col items-center py-6 gap-6 text-gray-400 shrink-0 print:hidden">
+            <div class="text-white font-bold text-xl mb-4">POS</div>
+            <button onclick="switchView('pos')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-pos"><i data-lucide="shopping-cart"></i></button>
+            <button onclick="switchView('inventory')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-inv"><i data-lucide="package"></i></button>
+            <button onclick="switchView('orders')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-orders"><i data-lucide="file-text"></i></button>
+            <div class="mt-auto">
+                <button id="logout-btn" class="p-3 rounded-xl hover:bg-red-900 text-red-400 transition"><i data-lucide="log-out"></i></button>
+            </div>
+        </nav>
+
+        <!-- Contenido -->
+        <main class="flex-1 overflow-hidden relative">
+            
+            <!-- VISTA POS (Ventas) -->
+            <div id="view-pos" class="h-full flex flex-col md:flex-row">
+                <!-- Catálogo -->
+                <div class="flex-1 p-6 overflow-y-auto bg-gray-100">
+                    <header class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800">Ventas</h2>
+                        <input type="text" id="search-input" placeholder="Buscar producto..." class="border p-2 rounded-full px-4 w-64 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                    </header>
+                    <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <!-- Aquí se inyectan los productos con JS -->
+                    </div>
+                </div>
+
+                <!-- Carrito -->
+                <div class="w-full md:w-96 bg-white shadow-xl border-l flex flex-col z-20">
+                    <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                        <h3 class="font-bold flex gap-2"><i data-lucide="shopping-cart"></i> Ticket</h3>
+                        <span id="cart-count" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full">0</span>
+                    </div>
+                    <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-2">
+                        <!-- Items del carrito -->
+                        <p class="text-center text-gray-400 mt-10">Carrito vacío</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 border-t space-y-2">
+                        <input type="text" id="customer-name" placeholder="Nombre Cliente" class="w-full border p-2 rounded text-sm mb-2">
+                        <div class="flex gap-2">
+                            <input type="number" id="discount-input" placeholder="Desc." class="w-full border p-2 rounded text-sm">
+                            <input type="number" id="delivery-input" placeholder="Envío" class="w-full border p-2 rounded text-sm">
+                        </div>
+                        <div class="flex justify-between text-lg font-bold border-t pt-2">
+                            <span>Total:</span>
+                            <span id="cart-total">$0.00</span>
+                        </div>
+                        <button onclick="processCheckout()" class="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700 transition">COBRAR</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VISTA INVENTARIO -->
+            <div id="view-inventory" class="h-full p-6 overflow-y-auto hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">Inventario</h2>
+                    <button onclick="toggleModal('modal-product')" class="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700"><i data-lucide="plus"></i> Nuevo</button>
+                </div>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-gray-100 text-sm text-gray-600">
+                            <tr>
+                                <th class="p-3">Producto</th>
+                                <th class="p-3">Categoría</th>
+                                <th class="p-3 text-right">Costo</th>
+                                <th class="p-3 text-right">Precio</th>
+                                <th class="p-3 text-center">Stock</th>
+                                <th class="p-3 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body">
+                            <!-- Filas de inventario -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VISTA HISTORIAL VENTAS -->
+            <div id="view-orders" class="h-full p-6 overflow-y-auto hidden">
+                <h2 class="text-2xl font-bold mb-6">Historial de Ventas</h2>
+                <div class="bg-white rounded shadow overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100 text-sm">
+                            <tr>
+                                <th class="p-3">ID</th>
+                                <th class="p-3">Fecha</th>
+                                <th class="p-3">Cliente</th>
+                                <th class="p-3 text-right">Total</th>
+                                <th class="p-3 text-center">Ver</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body">
+                            <!-- Ordenes -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- 3. VISTA DE FACTURA (Overlay completo para impresión) -->
+    <div id="invoice-view" class="fixed inset-0 bg-gray-800 z-[100] overflow-y-auto hidden flex flex-col items-center p-4">
+        <div class="w-full max-w-2xl bg-white shadow-2xl p-10 min-h-[600px] relative rounded-lg print:w-full print:shadow-none print:p-0" id="printable-area">
+            
+            <!-- Botones de Acción (No se imprimen) -->
+            <div class="absolute top-4 right-4 flex gap-2 print:hidden">
+                <button onclick="closeInvoice()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Cerrar</button>
+                <button onclick="window.print()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"><i data-lucide="printer"></i> Imprimir</button>
+                <button onclick="copyInvoiceLink()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="link"></i> Link</button>
+            </div>
+
+            <!-- Contenido Factura -->
+            <div class="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold text-gray-900">FACTURA</h1>
+                    <p id="inv-id" class="text-gray-500 text-sm mt-1">#ID</p>
+                </div>
+                <div class="text-right">
+                    <h2 class="text-xl font-bold text-indigo-600">Mi Tienda</h2>
+                    <p class="text-sm text-gray-500">Dirección del negocio</p>
+                </div>
+            </div>
+
+            <div class="flex justify-between mb-8">
+                <div>
+                    <p class="text-xs uppercase font-bold text-gray-500">Cliente</p>
+                    <p id="inv-customer" class="text-lg font-bold">Nombre</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-xs uppercase font-bold text-gray-500">Fecha</p>
+                    <p id="inv-date">00/00/0000</p>
+                </div>
+            </div>
+
+            <table class="w-full mb-8">
+                <thead>
+                    <tr class="border-b text-sm font-bold text-gray-600">
+                        <td class="py-2">Item</td>
+                        <td class="py-2 text-center">Cant</td>
+                        <td class="py-2 text-right">Precio</td>
+                        <td class="py-2 text-right">Total</td>
+                    </tr>
+                </thead>
+                <tbody id="inv-items" class="text-sm">
+                    <!-- Items -->
+                </tbody>
+            </table>
+
+            <div class="flex justify-end border-t pt-4">
+                <div class="w-1/2 space-y-1 text-right">
+                    <div class="flex justify-between"><span>Subtotal:</span> <span id="inv-subtotal">$0.00</span></div>
+                    <div class="flex justify-between text-green-600 hidden" id="inv-row-disc"><span>Desc:</span> <span id="inv-disc">-$0.00</span></div>
+                    <div class="flex justify-between text-blue-600 hidden" id="inv-row-del"><span>Envío:</span> <span id="inv-del">+$0.00</span></div>
+                    <div class="flex justify-between text-xl font-bold mt-2 pt-2 border-t"><span>Total:</span> <span id="inv-total">$0.00</span></div>
+                </div>
+            </div>
+            
+            <p class="mt-10 text-center text-xs text-gray-400">Gracias por su compra.</p>
+        </div>
+    </div>
+
+    <!-- MODAL AGREGAR PRODUCTO -->
+    <div id="modal-product" class="fixed inset-0 bg-black/50 z-40 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Añadir/Editar Producto</h3>
+            <form id="product-form" class="space-y-3">
+                <input type="hidden" name="id" id="prod-id">
+                <input required name="name" placeholder="Nombre Producto" class="w-full border p-2 rounded">
+                <div class="grid grid-cols-2 gap-2">
+                    <input required type="number" step="0.01" name="price" placeholder="Precio Venta" class="w-full border p-2 rounded">
+                    <input required type="number" step="0.01" name="cost" placeholder="Costo Unitario" class="w-full border p-2 rounded">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input required type="number" name="stock" placeholder="Stock Inicial" class="w-full border p-2 rounded">
+                    <input required name="category" placeholder="Categoría" class="w-full border p-2 rounded">
+                </div>
+                <input name="imageUrl" placeholder="URL Imagen (Opcional)" class="w-full border p-2 rounded">
+                
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleModal('modal-product')" class="flex-1 bg-gray-200 py-2 rounded">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts Modulares -->
+    <!-- IMPORTANTE: El orden importa y type="module" es clave -->
+    <script type="module" src="firebase-config.js"></script>
+    <script type="module" src="auth.js"></script>
+    <script type="module" src="app.js"></script>
+
+    <script>
+        // Funciones UI Globales simples (fuera de módulos para acceso HTML onclick)
+        function toggleModal(id) {
+            const el = document.getElementById(id);
+            if(el) el.classList.toggle('hidden');
+        }
+    </script>
+</body>
+</html>
+
+
