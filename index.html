@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POS Sistema de Ventas</title>
+    <title>POS Sistema de Ventas (Nicaragua)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Iconos Lucide -->
@@ -45,14 +45,26 @@
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-4 right-4 z-[100] space-y-2"></div>
 
-    <!-- 0. PANTALLA DE CARGA -->
-    <div id="loading-screen" class="fixed inset-0 z-[60] bg-gray-100 flex flex-col items-center justify-center">
-        <div class="loader mb-4"></div>
-        <h2 class="text-xl font-semibold text-gray-700">Cargando Sistema...</h2>
-        <p class="text-sm text-gray-500 mt-2">Conectando con base de datos</p>
+    <!-- 0. PANTALLA DE CARGA / ERROR DE CONFIGURACIÓN -->
+    <div id="loading-screen" class="fixed inset-0 z-[60] bg-gray-100 flex flex-col items-center justify-center p-4 text-center">
+        <div id="loader-spinner" class="loader mb-4"></div>
+        <h2 id="loading-title" class="text-xl font-semibold text-gray-700">Iniciando Sistema...</h2>
+        <div id="config-error-area" class="hidden max-w-lg w-full bg-white p-6 rounded-xl shadow-xl mt-4">
+            <div class="text-red-500 mb-4 flex flex-col items-center">
+                <i data-lucide="alert-triangle" class="w-12 h-12 mb-2"></i>
+                <h3 class="text-lg font-bold">Falta Configuración de Firebase</h3>
+            </div>
+            <p class="text-gray-600 text-sm mb-4">
+                El sistema no detectó las llaves de Firebase. Por favor, pega tu configuración JSON aquí para continuar:
+            </p>
+            <textarea id="manual-config-input" class="w-full h-32 border p-2 rounded text-xs font-mono bg-gray-50 mb-4" placeholder='{ "apiKey": "...", "authDomain": "...", ... }'></textarea>
+            <button onclick="saveManualConfig()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700">
+                Guardar y Conectar
+            </button>
+        </div>
     </div>
 
-    <!-- 1. PANTALLA DE LOGIN (Visible si no hay sesión) -->
+    <!-- 1. PANTALLA DE LOGIN -->
     <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 class="text-3xl font-bold text-center mb-2 text-indigo-600">POS Login</h2>
@@ -61,7 +73,7 @@
             <form id="login-form" class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="login-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" placeholder="ejemplo@correo.com" required>
+                    <input type="email" id="login-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" placeholder="usuario@negocio.com" required>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Contraseña</label>
@@ -72,7 +84,7 @@
 
             <form id="register-form" class="space-y-4 hidden">
                 <div class="bg-yellow-50 p-3 rounded border border-yellow-200 text-xs text-yellow-800 mb-2">
-                    ¡Regístrate para guardar tus productos permanentemente!
+                    ¡Crea una cuenta para guardar tus productos permanentemente!
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Email</label>
@@ -88,16 +100,6 @@
 
             <div class="mt-6 flex flex-col items-center space-y-3">
                 <button id="show-register-btn" class="text-sm text-indigo-600 hover:text-indigo-800 transition duration-150 font-medium">¿No tienes cuenta? Regístrate aquí</button>
-                
-                <div class="w-full flex items-center justify-between px-4">
-                    <div class="h-px bg-gray-200 w-full"></div>
-                    <span class="text-xs text-gray-400 px-2">O</span>
-                    <div class="h-px bg-gray-200 w-full"></div>
-                </div>
-
-                <button id="guest-login-btn" class="text-sm text-gray-500 hover:text-gray-700 border border-gray-300 px-4 py-2 rounded-full w-full hover:bg-gray-50 transition">
-                    Entrar como Invitado (Datos temporales)
-                </button>
             </div>
             
             <div id="auth-error-msg" class="mt-4 text-center bg-red-100 text-red-600 p-2 rounded text-sm hidden"></div>
@@ -133,7 +135,7 @@
         <!-- Contenido principal -->
         <main class="flex-1 flex overflow-hidden relative">
             
-            <!-- Columna 1: Productos (Vista de Venta) -->
+            <!-- Columna 1: Productos -->
             <div id="products-view" class="flex-1 flex flex-col p-4 overflow-y-auto bg-white">
                 <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-4">
                     <div class="relative flex-1">
@@ -149,13 +151,12 @@
                     </button>
                 </div>
                 
-                <!-- Grid de Productos -->
                 <div id="product-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-y-auto pb-4 content-start">
                     <p class="text-center text-gray-500 col-span-full mt-10">Cargando productos...</p>
                 </div>
             </div>
 
-            <!-- Columna 2: Inventario (Vista de Gestión) -->
+            <!-- Columna 2: Inventario -->
             <div id="inventory-view" class="flex-1 p-4 overflow-y-auto hidden bg-white">
                 <h2 class="text-2xl font-semibold mb-4 text-indigo-700">Inventario y Precios</h2>
                 <div class="bg-white shadow border rounded-xl overflow-hidden">
@@ -238,12 +239,10 @@
                 </div>
             </div>
             
-            <!-- Botón flotante para abrir carrito en móvil -->
             <button onclick="toggleCartMobile()" class="md:hidden fixed bottom-6 right-6 bg-indigo-600 text-white p-4 rounded-full shadow-2xl z-30 hover:bg-indigo-700">
                 <i data-lucide="shopping-cart" class="w-6 h-6"></i>
                 <span id="mobile-cart-badge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full hidden">0</span>
             </button>
-
         </main>
     </div>
 
@@ -414,7 +413,20 @@
 
     <!-- 6. Scripts Unificados (Módulos ES6) -->
     <script type="module">
-        // --- IMPORTACIONES DE FIREBASE ACTUALIZADAS (v11.6.1) ---
+        // --------------------------------------------------------------------------------
+        // 1. ZONA DE CONFIGURACIÓN MANUAL
+        // --------------------------------------------------------------------------------
+        // SI TIENES TUS LLAVES, PEGALAS AQUÍ DENTRO DE LAS COMILLAS
+        const manualConfig = {
+            apiKey: "",
+            authDomain: "",
+            projectId: "",
+            storageBucket: "",
+            messagingSenderId: "",
+            appId: ""
+        };
+        // --------------------------------------------------------------------------------
+
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getDatabase, ref, onValue, push, set, update, remove, get, query as dbQuery, limitToLast, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
         import { 
@@ -423,32 +435,81 @@
             signInWithEmailAndPassword, 
             onAuthStateChanged,
             signOut,
-            signInWithCustomToken,
-            signInAnonymously
+            signInWithCustomToken
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // CONFIGURACIÓN
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app';
-        
         let app, db, auth;
         let userId = null;
         let userEmail = 'Anónimo';
         let appInitialized = false;
+        
+        // --- LÓGICA DE INICIALIZACIÓN ROBUSTA ---
+        // Intenta cargar la config de 3 lugares:
+        // 1. Variable del entorno (automático)
+        // 2. Variable manualConfig (escrita en código)
+        // 3. Input del usuario (interfaz gráfica)
+        
+        async function initFirebase() {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app';
+            let config = null;
 
-        // INICIALIZACIÓN ROBUSTA DE FIREBASE
-        try {
-            if (Object.keys(firebaseConfig).length > 0) {
-                app = initializeApp(firebaseConfig);
+            // 1. Intentar variable de entorno
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                try {
+                    config = JSON.parse(__firebase_config);
+                } catch(e) {}
+            }
+
+            // 2. Intentar configuración manual en código
+            if ((!config || !config.apiKey) && manualConfig.apiKey) {
+                config = manualConfig;
+            }
+
+            // 3. Si no hay config, mostrar pantalla de error/input
+            if (!config || !config.apiKey) {
+                document.getElementById('loader-spinner').classList.add('hidden');
+                document.getElementById('loading-title').classList.add('hidden');
+                document.getElementById('config-error-area').classList.remove('hidden');
+                
+                // Exponer función para guardar desde la UI
+                window.saveManualConfig = () => {
+                    const val = document.getElementById('manual-config-input').value;
+                    try {
+                        const parsed = JSON.parse(val);
+                        if(parsed.apiKey) {
+                            config = parsed;
+                            startApp(config, appId);
+                        } else {
+                            window.alertMessage("Configuración inválida (Falta apiKey)", 'error');
+                        }
+                    } catch(e) {
+                        window.alertMessage("Error de formato JSON: " + e.message, 'error');
+                    }
+                };
+                return; // Detener hasta que el usuario ingrese datos
+            }
+
+            // Si tenemos config, arrancar
+            startApp(config, appId);
+        }
+
+        function startApp(config, appId) {
+            try {
+                document.getElementById('config-error-area').classList.add('hidden');
+                document.getElementById('loader-spinner').classList.remove('hidden');
+                document.getElementById('loading-title').classList.remove('hidden');
+                document.getElementById('loading-title').innerText = "Conectando...";
+
+                app = initializeApp(config);
                 db = getDatabase(app);
                 auth = getAuth(app);
-            } else {
-                console.warn("Falta configuración de Firebase.");
-                document.getElementById('loading-screen').innerHTML = '<p class="text-red-500">Error: No Firebase Config</p>';
+                
+                setupAuthListeners(appId);
+                
+            } catch (e) {
+                console.error("Firebase init error:", e);
+                window.alertMessage("Error al conectar Firebase: " + e.message, 'error');
             }
-        } catch (e) {
-            console.error("Firebase init error:", e);
-            document.getElementById('loading-screen').innerHTML = `<p class="text-red-500">Error de inicialización: ${e.message}</p>`;
         }
 
         // --- ESTADO GLOBAL ---
@@ -457,7 +518,7 @@
         let orders = [];
         let currentOrder = null;
         const IVA_RATE = 0.15;
-        const CURRENCY = "C$"; // Córdobas
+        const CURRENCY = "C$"; 
 
         // --- ELEMENTOS DOM ---
         const els = {
@@ -480,7 +541,7 @@
             authError: document.getElementById('auth-error-msg')
         };
 
-        // --- SISTEMA DE NOTIFICACIONES (Toast) ---
+        // --- SISTEMA DE NOTIFICACIONES ---
         window.alertMessage = (message, type = 'info') => {
             const container = document.getElementById('toast-container');
             const toast = document.createElement('div');
@@ -489,13 +550,11 @@
                 error: 'bg-red-100 border-red-400 text-red-800',
                 info: 'bg-blue-100 border-blue-400 text-blue-800'
             };
-            
             toast.className = `flex items-center w-full max-w-xs p-4 rounded-lg shadow-lg border-l-4 transform transition-all duration-300 translate-x-full ${colors[type] || colors.info}`;
             toast.innerHTML = `
                 <div class="flex-1 text-sm font-medium">${message}</div>
                 <button onclick="this.parentElement.remove()" class="ml-2 opacity-50 hover:opacity-100"><i data-lucide="x" class="w-4 h-4"></i></button>
             `;
-            
             container.appendChild(toast);
             requestAnimationFrame(() => toast.classList.remove('translate-x-full'));
             setTimeout(() => {
@@ -509,7 +568,6 @@
         window.toggleModal = (id) => {
             const el = document.getElementById(id);
             if(!el) return;
-            
             if (el.classList.contains('hidden')) {
                 el.classList.remove('hidden');
                 setTimeout(() => el.firstElementChild.classList.remove('scale-95', 'opacity-0'), 10);
@@ -535,13 +593,12 @@
             window.toggleModal('modal-product');
         }
 
-        // --- LÓGICA DE DATOS (REALTIME) ---
-        function startDataListeners(uid) {
+        // --- LÓGICA DE DATOS ---
+        function startDataListeners(uid, appId) {
             if (!db) return;
-
             const userRef = `artifacts/${appId}/users/${uid}`;
             
-            // 1. Productos
+            // Productos
             onValue(ref(db, `${userRef}/products`), (snap) => {
                 const data = snap.val();
                 products = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
@@ -550,7 +607,7 @@
                 updateCategoryFilter();
             });
 
-            // 2. Órdenes (Últimas 50)
+            // Órdenes
             const ordersQuery = dbQuery(ref(db, `${userRef}/orders`), limitToLast(50));
             onValue(ordersQuery, (snap) => {
                 const data = snap.val();
@@ -560,29 +617,16 @@
         }
 
         // --- AUTH FLOW ---
-        async function initAuth() {
-            if (!auth) return;
-            const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-            
-            try {
-                // SOLO iniciamos sesión si hay un token explícito del sistema.
-                // SI NO, esperamos a que el usuario use el formulario.
-                if (token) {
-                    await signInWithCustomToken(auth, token);
-                }
-                // ELIMINADO: signInAnonymously automático. 
-                // Esto permite que la pantalla de Auth sea visible por defecto.
-            } catch (e) {
-                console.error("Auth Init Error:", e);
+        function setupAuthListeners(appId) {
+            // Intento de login automático si hay token del sistema
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                 signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
             }
-        }
 
-        if (auth) {
             onAuthStateChanged(auth, (user) => {
-                els.loading.classList.add('hidden'); // Quitar loader
+                els.loading.classList.add('hidden'); // App lista
 
                 if (user) {
-                    // USUARIO LOGUEADO
                     userId = user.uid;
                     userEmail = user.email || 'Invitado';
                     document.getElementById('user-info').innerText = userEmail;
@@ -590,37 +634,30 @@
                     els.auth.classList.add('hidden');
                     
                     const urlParams = new URLSearchParams(window.location.search);
-                    const orderId = urlParams.get('orderId');
-
-                    if (orderId) {
-                        loadInvoiceData(orderId);
+                    if (urlParams.get('orderId')) {
+                        loadInvoiceData(urlParams.get('orderId'), appId);
                     } else {
                         els.app.classList.remove('hidden');
                     }
 
                     if (!appInitialized) {
-                        startDataListeners(userId);
+                        startDataListeners(userId, appId);
                         appInitialized = true;
                     }
                 } else {
-                    // USUARIO NO LOGUEADO -> MOSTRAR LOGIN
                     els.auth.classList.remove('hidden');
                     els.app.classList.add('hidden');
-                    // Resetear datos en memoria
                     products = [];
                     cart = [];
                     orders = [];
                     appInitialized = false;
                 }
             });
-            
-            initAuth();
         }
 
-        // --- MANEJO DE FORMULARIOS AUTH ---
+        // --- MANEJO FORMULARIOS LOGIN/REGISTRO ---
         const loginForm = document.getElementById('login-form');
         const regForm = document.getElementById('register-form');
-        const guestBtn = document.getElementById('guest-login-btn');
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -642,7 +679,7 @@
             const pass = document.getElementById('reg-pass').value;
             try {
                 await createUserWithEmailAndPassword(auth, email, pass);
-                window.alertMessage("¡Cuenta creada con éxito!", 'success');
+                window.alertMessage("¡Cuenta creada!", 'success');
                 regForm.reset();
             } catch (error) {
                 els.authError.innerText = error.message;
@@ -650,61 +687,36 @@
             }
         });
 
-        guestBtn.addEventListener('click', async () => {
-             try {
-                await signInAnonymously(auth);
-             } catch(error) {
-                els.authError.innerText = "Error al entrar como invitado: " + error.message;
-                els.authError.classList.remove('hidden');
-             }
-        });
-
         document.getElementById('logout-btn').addEventListener('click', () => {
-            if(confirm("¿Seguro que desea salir?")) {
-                signOut(auth);
-            }
+            if(confirm("¿Seguro que desea salir?")) signOut(auth);
         });
 
-        // Toggle formularios
         document.getElementById('show-register-btn').addEventListener('click', () => {
             loginForm.classList.add('hidden');
-            guestBtn.parentElement.classList.add('hidden'); // Ocultar boton invitado
             regForm.classList.remove('hidden');
         });
         document.getElementById('cancel-reg-btn').addEventListener('click', () => {
             regForm.classList.add('hidden');
             loginForm.classList.remove('hidden');
-            guestBtn.parentElement.classList.remove('hidden');
         });
 
-        // --- RENDERIZADO PRODUCTOS ---
+        // --- FUNCIONES APP (PRODUCTOS, CART, ETC) ---
         function renderProductGrid() {
             let list = products;
             const term = els.search.value.toLowerCase();
             const cat = els.catFilter.value;
-
             if (term) list = list.filter(p => p.name.toLowerCase().includes(term));
             if (cat) list = list.filter(p => p.category === cat);
 
             if (list.length === 0) {
-                els.grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-gray-400 mt-10">
-                    <i data-lucide="package-open" class="w-12 h-12 mb-2"></i>
-                    <p>No se encontraron productos</p>
-                </div>`;
+                els.grid.innerHTML = `<div class="col-span-full flex flex-col items-center justify-center text-gray-400 mt-10"><i data-lucide="package-open" class="w-12 h-12 mb-2"></i><p>No se encontraron productos</p></div>`;
             } else {
                 els.grid.innerHTML = list.map(p => `
-                    <div onclick="addToCart('${p.id}')" 
-                         class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all group relative animate-fade-in">
-                        
+                    <div onclick="addToCart('${p.id}')" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all group relative">
                         ${p.stock <= 5 ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full z-10">Bajo Stock</span>` : ''}
-                        
                         <div class="h-32 bg-gray-50 flex items-center justify-center overflow-hidden">
-                            ${p.imageUrl 
-                                ? `<img src="${p.imageUrl}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/150?text=IMG'">`
-                                : `<i data-lucide="package" class="w-10 h-10 text-gray-300"></i>`
-                            }
+                            ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/150?text=IMG'">` : `<i data-lucide="package" class="w-10 h-10 text-gray-300"></i>`}
                         </div>
-                        
                         <div class="p-3">
                             <h3 class="font-semibold text-gray-800 text-sm truncate" title="${p.name}">${p.name}</h3>
                             <div class="flex justify-between items-end mt-1">
@@ -712,13 +724,7 @@
                                 <span class="text-xs text-gray-400">Stock: ${p.stock}</span>
                             </div>
                         </div>
-                        <div class="absolute inset-0 bg-indigo-600/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span class="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-                                + Agregar
-                            </span>
-                        </div>
-                    </div>
-                `).join('');
+                    </div>`).join('');
             }
             if(window.lucide) window.lucide.createIcons();
         }
@@ -735,191 +741,91 @@
         els.search.addEventListener('input', renderProductGrid);
         els.catFilter.addEventListener('change', renderProductGrid);
 
-        // --- CARRITO ---
         window.addToCart = (id) => {
             const prod = products.find(p => p.id === id);
             if (!prod) return;
-
             const existing = cart.find(i => i.id === id);
             const currentQty = existing ? existing.quantity : 0;
-            if (currentQty + 1 > prod.stock) {
-                window.alertMessage(`¡Solo quedan ${prod.stock} unidades!`, 'error');
-                return;
-            }
-
+            if (currentQty + 1 > prod.stock) { window.alertMessage(`¡Solo quedan ${prod.stock}!`, 'error'); return; }
             if (existing) existing.quantity++;
             else cart.push({ ...prod, quantity: 1 });
             renderCart();
-            
-            if (window.innerWidth < 768) {
-                const badge = document.getElementById('mobile-cart-badge');
-                badge.classList.add('scale-125');
-                setTimeout(() => badge.classList.remove('scale-125'), 200);
-            }
         };
 
         window.updateCartQty = (id, delta) => {
             const item = cart.find(i => i.id === id);
             if (!item) return;
             const prod = products.find(p => p.id === id);
-            
-            if (delta > 0) {
-                if (item.quantity + 1 > prod.stock) {
-                    window.alertMessage("Stock insuficiente", 'error');
-                    return;
-                }
-                item.quantity++;
-            } else {
-                item.quantity--;
-            }
-
+            if (delta > 0 && item.quantity + 1 > prod.stock) { window.alertMessage("Stock insuficiente", 'error'); return; }
+            item.quantity += delta;
             if (item.quantity <= 0) cart = cart.filter(i => i.id !== id);
             renderCart();
         };
 
         function renderCart() {
-            let subtotal = 0;
-            let count = 0;
-
+            let subtotal = 0, count = 0;
             if (cart.length === 0) {
-                els.cartContainer.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-48 text-gray-400">
-                        <i data-lucide="shopping-basket" class="w-10 h-10 mb-2 opacity-50"></i>
-                        <p class="text-sm">Carrito vacío</p>
-                    </div>`;
+                els.cartContainer.innerHTML = `<div class="flex flex-col items-center justify-center h-48 text-gray-400"><i data-lucide="shopping-basket" class="w-10 h-10 mb-2 opacity-50"></i><p class="text-sm">Carrito vacío</p></div>`;
                 els.checkoutBtn.disabled = true;
             } else {
                 els.checkoutBtn.disabled = false;
                 els.cartContainer.innerHTML = cart.map(item => {
                     subtotal += item.price * item.quantity;
                     count += item.quantity;
-                    return `
-                        <div class="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg shadow-sm animate-fade-in-up">
-                            <div class="flex-1 min-w-0 pr-2">
-                                <p class="font-medium text-gray-800 text-sm truncate">${item.name}</p>
-                                <p class="text-xs text-indigo-600 font-semibold">${CURRENCY}${item.price.toFixed(2)}</p>
-                            </div>
+                    return `<div class="flex items-center justify-between p-2 bg-white border border-gray-100 rounded-lg shadow-sm">
+                            <div class="flex-1 min-w-0 pr-2"><p class="font-medium text-gray-800 text-sm truncate">${item.name}</p><p class="text-xs text-indigo-600 font-semibold">${CURRENCY}${item.price.toFixed(2)}</p></div>
                             <div class="flex items-center bg-gray-50 rounded-lg p-1">
-                                <button onclick="updateCartQty('${item.id}', -1)" class="p-1 hover:bg-white hover:shadow rounded text-gray-600"><i data-lucide="minus" class="w-3 h-3"></i></button>
+                                <button onclick="updateCartQty('${item.id}', -1)" class="p-1 hover:bg-white text-gray-600"><i data-lucide="minus" class="w-3 h-3"></i></button>
                                 <span class="text-sm font-bold w-6 text-center">${item.quantity}</span>
-                                <button onclick="updateCartQty('${item.id}', 1)" class="p-1 hover:bg-white hover:shadow rounded text-gray-600"><i data-lucide="plus" class="w-3 h-3"></i></button>
+                                <button onclick="updateCartQty('${item.id}', 1)" class="p-1 hover:bg-white text-gray-600"><i data-lucide="plus" class="w-3 h-3"></i></button>
                             </div>
-                            <div class="text-right w-16">
-                                <span class="font-bold text-sm text-gray-700">${CURRENCY}${(item.price * item.quantity).toFixed(2)}</span>
-                            </div>
-                        </div>
-                    `;
+                            <div class="text-right w-16"><span class="font-bold text-sm text-gray-700">${CURRENCY}${(item.price * item.quantity).toFixed(2)}</span></div>
+                        </div>`;
                 }).join('');
             }
-
             const tax = subtotal * IVA_RATE;
-            const total = subtotal + tax;
-
             els.cartSubtotal.innerText = `${CURRENCY}${subtotal.toFixed(2)}`;
             els.cartTax.innerText = `${CURRENCY}${tax.toFixed(2)}`;
-            els.cartTotal.innerText = `${CURRENCY}${total.toFixed(2)}`;
+            els.cartTotal.innerText = `${CURRENCY}${(subtotal + tax).toFixed(2)}`;
             els.cartCount.innerText = count;
-            
             els.mobileBadge.innerText = count;
             els.mobileBadge.classList.toggle('hidden', count === 0);
-
-            document.getElementById('checkout-total-display').innerText = `${CURRENCY}${total.toFixed(2)}`;
-            document.getElementById('checkout-paid').value = total.toFixed(2);
+            
+            document.getElementById('checkout-total-display').innerText = `${CURRENCY}${(subtotal + tax).toFixed(2)}`;
+            document.getElementById('checkout-paid').value = (subtotal + tax).toFixed(2);
             calculateChange();
             if(window.lucide) window.lucide.createIcons();
         }
 
-        window.clearCart = () => {
-            if(cart.length > 0 && confirm("¿Vaciar carrito?")) {
-                cart = [];
-                renderCart();
-            }
-        };
-
-        // --- GESTIÓN INVENTARIO ---
-        window.resetProductForm = () => {
-            document.getElementById('product-form').reset();
-            document.getElementById('product-id').value = '';
-            document.getElementById('delete-product-btn').classList.add('hidden');
-            document.getElementById('product-modal-title').innerText = 'Nuevo Producto';
-        };
-
-        window.editProduct = (id) => {
-            const p = products.find(x => x.id === id);
-            if(!p) return;
-            document.getElementById('product-id').value = p.id;
-            const f = document.getElementById('product-form');
-            f.name.value = p.name;
-            f.price.value = p.price;
-            f.cost.value = p.cost;
-            f.stock.value = p.stock;
-            f.category.value = p.category;
-            f.imageUrl.value = p.imageUrl || '';
-            document.getElementById('delete-product-btn').classList.remove('hidden');
-            document.getElementById('product-modal-title').innerText = 'Editar Producto';
-            window.toggleModal('modal-product');
-        };
-
+        window.clearCart = () => { if(cart.length > 0 && confirm("¿Vaciar carrito?")) { cart = []; renderCart(); }};
+        
+        // --- CRUD ---
+        window.resetProductForm = () => { document.getElementById('product-form').reset(); document.getElementById('product-id').value = ''; document.getElementById('delete-product-btn').classList.add('hidden'); document.getElementById('product-modal-title').innerText = 'Nuevo Producto'; };
+        window.editProduct = (id) => { const p = products.find(x => x.id === id); if(!p) return; document.getElementById('product-id').value = p.id; const f = document.getElementById('product-form'); f.name.value = p.name; f.price.value = p.price; f.cost.value = p.cost; f.stock.value = p.stock; f.category.value = p.category; f.imageUrl.value = p.imageUrl || ''; document.getElementById('delete-product-btn').classList.remove('hidden'); document.getElementById('product-modal-title').innerText = 'Editar Producto'; window.toggleModal('modal-product'); };
+        
         document.getElementById('product-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const f = e.target;
             const id = document.getElementById('product-id').value;
-            const productData = {
-                name: f.name.value,
-                price: parseFloat(f.price.value),
-                cost: parseFloat(f.cost.value),
-                stock: parseInt(f.stock.value),
-                category: f.category.value,
-                imageUrl: f.imageUrl.value
-            };
-            const path = `artifacts/${appId}/users/${userId}/products/${id || push(ref(db)).key}`;
-            try {
-                await set(ref(db, path), productData);
-                window.toggleModal('modal-product');
-                window.alertMessage(id ? "Actualizado" : "Creado", 'success');
-            } catch(err) {
-                window.alertMessage(err.message, 'error');
-            }
+            const path = `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app'}/users/${userId}/products/${id || push(ref(db)).key}`;
+            await set(ref(db, path), { name: f.name.value, price: parseFloat(f.price.value), cost: parseFloat(f.cost.value), stock: parseInt(f.stock.value), category: f.category.value, imageUrl: f.imageUrl.value });
+            window.toggleModal('modal-product');
+            window.alertMessage(id ? "Actualizado" : "Creado", 'success');
         });
 
-        window.deleteProduct = async () => {
-            const id = document.getElementById('product-id').value;
-            if(id && confirm("¿Eliminar producto permanentemente?")) {
-                try {
-                    await remove(ref(db, `artifacts/${appId}/users/${userId}/products/${id}`));
-                    window.toggleModal('modal-product');
-                    window.alertMessage("Eliminado", 'success');
-                } catch(err) { window.alertMessage(err.message, 'error'); }
-            }
-        };
+        window.deleteProduct = async () => { const id = document.getElementById('product-id').value; if(id && confirm("¿Eliminar?")) { await remove(ref(db, `artifacts/${typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app'}/users/${userId}/products/${id}`)); window.toggleModal('modal-product'); }};
+        
+        function renderInventoryTable() { els.invTable.innerHTML = products.map(p => `<tr class="hover:bg-gray-50 border-b"><td class="px-6 py-4 text-sm font-medium text-gray-900">${p.name}</td><td class="px-6 py-4 text-sm text-gray-500">${CURRENCY}${p.price.toFixed(2)}</td><td class="px-6 py-4 text-sm ${p.stock<5?'text-red-600 font-bold':'text-gray-500'}">${p.stock}</td><td class="px-6 py-4 text-right"><button onclick="editProduct('${p.id}')" class="text-indigo-600 font-semibold">Editar</button></td></tr>`).join(''); }
 
-        function renderInventoryTable() {
-            els.invTable.innerHTML = products.map(p => `
-                <tr class="hover:bg-gray-50 border-b last:border-0 transition-colors">
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.name}</td>
-                    <td class="px-6 py-4 text-sm text-gray-500">${CURRENCY}${p.price.toFixed(2)}</td>
-                    <td class="px-6 py-4 text-sm ${p.stock < 5 ? 'text-red-600 font-bold' : 'text-gray-500'}">${p.stock}</td>
-                    <td class="px-6 py-4 text-right text-sm">
-                        <button onclick="editProduct('${p.id}')" class="text-indigo-600 hover:text-indigo-900 font-semibold flex items-center gap-1 justify-end">
-                            <span>Editar</span> <i data-lucide="edit-2" class="w-4 h-4"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-            if(window.lucide) window.lucide.createIcons();
-        }
-
-        // --- CHECKOUT LOGIC ---
+        // --- CHECKOUT ---
         const checkoutPaidInput = document.getElementById('checkout-paid');
         const checkoutDiscInput = document.getElementById('checkout-discount-percent');
         const checkoutDelInput = document.getElementById('checkout-delivery');
 
         function calculateChange() {
-            const totalStr = document.getElementById('checkout-total-display').innerText.replace(CURRENCY,'');
-            const total = parseFloat(totalStr) || 0;
+            const total = parseFloat(document.getElementById('checkout-total-display').innerText.replace(CURRENCY,'')) || 0;
             const paid = parseFloat(checkoutPaidInput.value) || 0;
             const change = paid - total;
-            
             const elChange = document.getElementById('checkout-change-display');
             elChange.innerText = `${CURRENCY}${change.toFixed(2)}`;
             elChange.className = `text-xl font-bold ${change < 0 ? 'text-red-500' : 'text-green-600'}`;
@@ -927,15 +833,11 @@
         }
 
         function updateCheckoutTotals() {
-            const subtotalText = els.cartSubtotal.innerText.replace(CURRENCY, '');
-            const subRaw = parseFloat(subtotalText) || 0;
+            const subRaw = parseFloat(els.cartSubtotal.innerText.replace(CURRENCY,'')) || 0;
             const discPct = parseFloat(checkoutDiscInput.value) || 0;
             const delivery = parseFloat(checkoutDelInput.value) || 0;
-            const discAmt = subRaw * (discPct / 100);
-            const subAfterDisc = subRaw - discAmt;
-            const tax = subAfterDisc * IVA_RATE;
-            const final = subAfterDisc + tax + delivery;
-
+            const subAfterDisc = subRaw - (subRaw * (discPct / 100));
+            const final = subAfterDisc + (subAfterDisc * IVA_RATE) + delivery;
             document.getElementById('checkout-total-display').innerText = `${CURRENCY}${final.toFixed(2)}`;
             checkoutPaidInput.value = final.toFixed(2);
             calculateChange();
@@ -946,12 +848,9 @@
 
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!userId || cart.length === 0) return;
-
             const btn = document.getElementById('confirm-checkout-btn');
-            btn.disabled = true;
-            btn.innerHTML = 'Procesando...';
-
+            btn.disabled = true; btn.innerHTML = 'Procesando...';
+            
             const subRaw = parseFloat(els.cartSubtotal.innerText.replace(CURRENCY,''));
             const discPct = parseFloat(checkoutDiscInput.value) || 0;
             const delivery = parseFloat(checkoutDelInput.value) || 0;
@@ -961,83 +860,37 @@
             const paid = parseFloat(checkoutPaidInput.value);
 
             let error = null;
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app';
+            
             for (const item of cart) {
-                const pRef = ref(db, `artifacts/${appId}/users/${userId}/products/${item.id}`);
                 try {
-                    await runTransaction(pRef, (p) => {
+                    await runTransaction(ref(db, `artifacts/${appId}/users/${userId}/products/${item.id}`), (p) => {
                         if (p) {
-                            if (p.stock < item.quantity) throw new Error("Stock insuficiente");
+                            if (p.stock < item.quantity) throw new Error();
                             p.stock -= item.quantity;
                         }
                         return p;
                     });
-                } catch(err) {
-                    error = `Error stock: ${item.name}`;
-                    break;
-                }
+                } catch(err) { error = `Error stock: ${item.name}`; break; }
             }
 
             if (!error) {
-                const order = {
-                    date: new Date().toISOString(),
-                    cart: cart.map(c => ({ id:c.id, name:c.name, price:c.price, cost:c.cost, quantity:c.quantity })),
-                    subtotal: subRaw,
-                    tax, discount: discAmt, delivery, total, paid,
-                    change: paid - total,
-                    userName: userEmail
-                };
+                const order = { date: new Date().toISOString(), cart, subtotal: subRaw, tax, discount: discAmt, delivery, total, paid, change: paid - total, userName: userEmail };
                 const newRef = push(ref(db, `artifacts/${appId}/users/${userId}/orders`));
                 await set(newRef, order);
-                window.alertMessage("¡Venta Exitosa!", 'success');
-                cart = [];
-                renderCart();
-                window.toggleModal('modal-checkout');
-                showInvoice({ id: newRef.key, ...order });
-            } else {
-                window.alertMessage(error, 'error');
-            }
-            btn.disabled = false;
-            btn.innerHTML = `<i data-lucide="check-circle" class="w-5 h-5"></i> Confirmar`;
-            if(window.lucide) window.lucide.createIcons();
+                cart = []; renderCart(); window.toggleModal('modal-checkout'); showInvoice({ id: newRef.key, ...order });
+            } else { window.alertMessage(error, 'error'); }
+            
+            btn.disabled = false; btn.innerHTML = 'Confirmar';
         });
 
-        // --- FACTURAS Y ORDENES ---
-        function renderOrdersTable() {
-            els.ordersTable.innerHTML = orders.map(o => `
-                <tr class="hover:bg-gray-50 border-b last:border-0">
-                    <td class="px-4 py-3 text-sm font-mono text-gray-600">
-                        <div class="font-bold text-gray-800">${o.id.slice(-6)}</div>
-                        <div class="text-xs text-gray-400">${new Date(o.date).toLocaleDateString()}</div>
-                    </td>
-                    <td class="px-4 py-3 text-sm font-bold text-gray-800">${CURRENCY}${o.total.toFixed(2)}</td>
-                    <td class="px-4 py-3 text-sm">
-                        <button onclick="showOrderInvoice('${o.id}')" class="text-indigo-600 hover:bg-indigo-50 p-2 rounded-lg transition-colors">
-                            <i data-lucide="receipt" class="w-5 h-5"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-            if(window.lucide) window.lucide.createIcons();
-        }
-
-        window.showOrderInvoice = (id) => {
-            const o = orders.find(x => x.id === id);
-            if(o) showInvoice(o);
-        };
-
-        async function loadInvoiceData(id) {
-            if(!db || !userId) return;
-            try {
-                const snap = await get(ref(db, `artifacts/${appId}/users/${userId}/orders/${id}`));
-                if(snap.exists()) {
-                    const data = { id, ...snap.val() };
-                    showInvoice(data);
-                    els.app.classList.add('hidden'); 
-                    els.loading.classList.add('hidden');
-                } else {
-                    els.loading.innerHTML = '<p class="text-red-500">Factura no encontrada</p>';
-                }
-            } catch(e) { console.error(e); }
+        // --- INVOICES ---
+        function renderOrdersTable() { els.ordersTable.innerHTML = orders.map(o => `<tr class="hover:bg-gray-50 border-b"><td class="px-4 py-3 text-sm font-mono"><div class="font-bold">${o.id.slice(-6)}</div><div class="text-xs text-gray-400">${new Date(o.date).toLocaleDateString()}</div></td><td class="px-4 py-3 text-sm font-bold">${CURRENCY}${o.total.toFixed(2)}</td><td class="px-4 py-3"><button onclick="showOrderInvoice('${o.id}')" class="text-indigo-600"><i data-lucide="receipt" class="w-5 h-5"></i></button></td></tr>`).join(''); if(window.lucide) window.lucide.createIcons(); }
+        window.showOrderInvoice = (id) => { const o = orders.find(x => x.id === id); if(o) showInvoice(o); };
+        async function loadInvoiceData(id, appId) { 
+            const snap = await get(ref(db, `artifacts/${appId}/users/${userId}/orders/${id}`));
+            if(snap.exists()) { showInvoice({ id, ...snap.val() }); els.app.classList.add('hidden'); els.loading.classList.add('hidden'); }
+            else els.loading.innerHTML = '<p class="text-red-500">Factura no encontrada</p>';
         }
 
         function showInvoice(o) {
@@ -1045,62 +898,19 @@
             document.getElementById('inv-order-id').innerText = o.id.slice(-8).toUpperCase();
             document.getElementById('inv-date').innerText = new Date(o.date).toLocaleString();
             document.getElementById('inv-user').innerText = o.userName;
-            
-            document.getElementById('inv-items-body').innerHTML = o.cart.map(i => `
-                <tr class="border-b border-gray-100 last:border-0">
-                    <td class="py-2 text-left">${i.name}</td>
-                    <td class="py-2 text-center text-gray-500">${i.quantity}</td>
-                    <td class="py-2 text-right font-medium">${CURRENCY}${(i.price * i.quantity).toFixed(2)}</td>
-                </tr>
-            `).join('');
-
+            document.getElementById('inv-items-body').innerHTML = o.cart.map(i => `<tr class="border-b border-gray-100"><td class="py-2 text-left">${i.name}</td><td class="py-2 text-center text-gray-500">${i.quantity}</td><td class="py-2 text-right">${CURRENCY}${(i.price * i.quantity).toFixed(2)}</td></tr>`).join('');
             document.getElementById('inv-subtotal').innerText = `${CURRENCY}${o.subtotal.toFixed(2)}`;
             document.getElementById('inv-tax').innerText = `${CURRENCY}${o.tax.toFixed(2)}`;
             document.getElementById('inv-total').innerText = `${CURRENCY}${o.total.toFixed(2)}`;
             document.getElementById('inv-paid').innerText = `${CURRENCY}${o.paid.toFixed(2)}`;
             document.getElementById('inv-change').innerText = `${CURRENCY}${o.change.toFixed(2)}`;
-
-            const rowDisc = document.getElementById('inv-row-disc');
-            const rowDel = document.getElementById('inv-row-del');
-            
-            if (o.discount > 0) {
-                rowDisc.classList.remove('hidden');
-                document.getElementById('inv-disc').innerText = `-${CURRENCY}${o.discount.toFixed(2)}`;
-            } else { rowDisc.classList.add('hidden'); }
-            
-            if (o.delivery > 0) {
-                rowDel.classList.remove('hidden');
-                document.getElementById('inv-del').innerText = `+${CURRENCY}${o.delivery.toFixed(2)}`;
-            } else { rowDel.classList.add('hidden'); }
-
             document.getElementById('invoice-view').classList.remove('hidden');
         }
 
-        window.closeInvoice = () => {
-            document.getElementById('invoice-view').classList.add('hidden');
-            const url = new URLSearchParams(window.location.search);
-            if(url.get('orderId')) {
-                window.location.href = window.location.pathname;
-            } else {
-                els.app.classList.remove('hidden');
-            }
-        };
+        window.closeInvoice = () => { document.getElementById('invoice-view').classList.add('hidden'); if(new URLSearchParams(window.location.search).get('orderId')) window.location.href = window.location.pathname; else els.app.classList.remove('hidden'); };
+        window.copyInvoiceLink = () => { if(!currentOrder) return; const t = document.createElement('input'); t.value = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); window.alertMessage("Enlace copiado", 'success'); };
 
-        window.copyInvoiceLink = () => {
-            if(!currentOrder) return;
-            const url = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
-            const temp = document.createElement('input');
-            document.body.appendChild(temp);
-            temp.value = url;
-            temp.select();
-            document.execCommand('copy');
-            document.body.removeChild(temp);
-            window.alertMessage("Enlace copiado", 'success');
-        };
-
-        window.addEventListener('load', () => {
-            if(window.lucide) window.lucide.createIcons();
-        });
+        window.addEventListener('load', () => { if(window.lucide) window.lucide.createIcons(); initFirebase(); });
     </script>
 </body>
 </html>
