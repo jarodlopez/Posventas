@@ -415,15 +415,16 @@
     <script type="module">
         // --------------------------------------------------------------------------------
         // 1. ZONA DE CONFIGURACIÓN MANUAL
+        //    *** CONFIGURACIÓN PROVISTA POR EL USUARIO AÑADIDA AQUÍ ***
         // --------------------------------------------------------------------------------
-        // SI TIENES TUS LLAVES, PEGALAS AQUÍ DENTRO DE LAS COMILLAS
         const manualConfig = {
-            apiKey: "",
-            authDomain: "",
-            projectId: "",
-            storageBucket: "",
-            messagingSenderId: "",
-            appId: ""
+            apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
+            authDomain: "posdeventas-a03ca.firebaseapp.com",
+            projectId: "posdeventas-a03ca",
+            storageBucket: "posdeventas-a03ca.firebasestorage.app",
+            messagingSenderId: "975141670948",
+            appId: "1:975141670948:web:e58ed3da11878ecfdf88b1",
+            databaseURL: "https://posdeventas-a03ca-default-rtdb.firebaseio.com" // Añadida databaseURL para mayor compatibilidad con RTDB
         };
         // --------------------------------------------------------------------------------
 
@@ -446,7 +447,7 @@
         // --- LÓGICA DE INICIALIZACIÓN ROBUSTA ---
         // Intenta cargar la config de 3 lugares:
         // 1. Variable del entorno (automático)
-        // 2. Variable manualConfig (escrita en código)
+        // 2. Variable manualConfig (escrita en código) <--- ESTA ES LA QUE YA CONTIENE TUS LLAVES
         // 3. Input del usuario (interfaz gráfica)
         
         async function initFirebase() {
@@ -914,5 +915,4 @@
     </script>
 </body>
 </html>
-
 
