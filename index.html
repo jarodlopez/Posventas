@@ -3,17 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POS Sistema de Ventas</title>
-    <!-- Tailwind CSS (Diseño rápido) -->
+    <title>POS Sistema de Ventas - Reparado</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Iconos -->
+    <!-- Iconos Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <!-- Estilos Propios -->
-    <link rel="stylesheet" href="style.css">
+    
+    <!-- ESTILOS CSS -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+
+        /* Scrollbar personalizado */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+
+        /* Loader simple */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #4f46e5;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* REGLAS PARA IMPRESIÓN (FACTURA) */
+        @media print {
+            body > *:not(#invoice-view) { display: none !important; }
+            #invoice-view {
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                background: white; display: block !important;
+                overflow: visible; padding: 0; margin: 0; z-index: 9999;
+            }
+            #printable-area { box-shadow: none; max-width: 100%; width: 100%; margin: 0; padding: 20px; }
+            .print\:hidden { display: none !important; }
+        }
+    </style>
 </head>
 <body class="bg-gray-100 text-gray-900 font-sans overflow-hidden">
 
-    <!-- 1. PANTALLA DE LOGIN (Se muestra si no hay usuario) -->
+    <!-- PANTALLA DE CARGA INICIAL -->
+    <div id="loading-screen" class="fixed inset-0 z-[60] bg-white flex items-center justify-center">
+        <div class="flex flex-col items-center">
+            <div class="loader w-10 h-10 border-4 mb-4"></div>
+            <p class="text-gray-500 font-medium">Cargando sistema...</p>
+        </div>
+    </div>
+
+    <!-- 1. PANTALLA DE LOGIN -->
     <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden">
         <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 class="text-3xl font-bold text-center mb-6 text-indigo-600">POS Login</h2>
@@ -27,7 +73,9 @@
                     <label class="block text-sm font-medium text-gray-700">Contraseña</label>
                     <input type="password" id="login-pass" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-bold">Entrar</button>
+                <button type="submit" id="btn-login-submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-bold flex justify-center items-center gap-2">
+                    Entrar
+                </button>
             </form>
 
             <div class="mt-4 text-center border-t pt-4">
@@ -35,7 +83,7 @@
                 <button id="show-register-btn" class="text-indigo-600 font-medium text-sm">Registrar nuevo usuario</button>
             </div>
 
-            <!-- Formulario Registro (Oculto por defecto) -->
+            <!-- Formulario Registro -->
             <form id="register-form" class="space-y-4 mt-4 hidden">
                 <h3 class="text-lg font-bold">Crear Usuario</h3>
                 <input type="email" id="reg-email" placeholder="Email" class="w-full border p-2 rounded" required>
@@ -46,17 +94,17 @@
         </div>
     </div>
 
-    <!-- 2. APLICACIÓN PRINCIPAL (Se muestra al loguear) -->
+    <!-- 2. APLICACIÓN PRINCIPAL -->
     <div id="app-screen" class="flex h-screen hidden">
         
         <!-- Sidebar Menú -->
         <nav class="w-20 bg-gray-900 flex flex-col items-center py-6 gap-6 text-gray-400 shrink-0 print:hidden">
             <div class="text-white font-bold text-xl mb-4">POS</div>
-            <button onclick="switchView('pos')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-pos"><i data-lucide="shopping-cart"></i></button>
-            <button onclick="switchView('inventory')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-inv"><i data-lucide="package"></i></button>
-            <button onclick="switchView('orders')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-orders"><i data-lucide="file-text"></i></button>
+            <button onclick="window.switchView('pos')" class="p-3 rounded-xl bg-indigo-600 text-white hover:bg-gray-800 transition" id="nav-pos" title="Ventas"><i data-lucide="shopping-cart"></i></button>
+            <button onclick="window.switchView('inventory')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-inv" title="Inventario"><i data-lucide="package"></i></button>
+            <button onclick="window.switchView('orders')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-orders" title="Historial"><i data-lucide="file-text"></i></button>
             <div class="mt-auto">
-                <button id="logout-btn" class="p-3 rounded-xl hover:bg-red-900 text-red-400 transition"><i data-lucide="log-out"></i></button>
+                <button id="logout-btn" class="p-3 rounded-xl hover:bg-red-900 text-red-400 transition" title="Salir"><i data-lucide="log-out"></i></button>
             </div>
         </nav>
 
@@ -66,37 +114,39 @@
             <!-- VISTA POS (Ventas) -->
             <div id="view-pos" class="h-full flex flex-col md:flex-row">
                 <!-- Catálogo -->
-                <div class="flex-1 p-6 overflow-y-auto bg-gray-100">
-                    <header class="flex justify-between items-center mb-6">
+                <div class="flex-1 p-6 overflow-y-auto bg-gray-100 relative">
+                    <header class="flex justify-between items-center mb-6 sticky top-0 z-10 bg-gray-100 py-2">
                         <h2 class="text-2xl font-bold text-gray-800">Ventas</h2>
                         <input type="text" id="search-input" placeholder="Buscar producto..." class="border p-2 rounded-full px-4 w-64 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
                     </header>
-                    <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        <!-- Aquí se inyectan los productos con JS -->
+                    <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
+                        <!-- Productos aquí -->
+                        <div class="col-span-full text-center text-gray-400 py-10">Cargando productos...</div>
                     </div>
                 </div>
 
                 <!-- Carrito -->
-                <div class="w-full md:w-96 bg-white shadow-xl border-l flex flex-col z-20">
+                <div class="w-full md:w-96 bg-white shadow-xl border-l flex flex-col z-20 h-[40vh] md:h-full">
                     <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
                         <h3 class="font-bold flex gap-2"><i data-lucide="shopping-cart"></i> Ticket</h3>
                         <span id="cart-count" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full">0</span>
                     </div>
                     <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-2">
-                        <!-- Items del carrito -->
                         <p class="text-center text-gray-400 mt-10">Carrito vacío</p>
                     </div>
                     <div class="p-4 bg-gray-50 border-t space-y-2">
-                        <input type="text" id="customer-name" placeholder="Nombre Cliente" class="w-full border p-2 rounded text-sm mb-2">
+                        <input type="text" id="customer-name" placeholder="Nombre Cliente (Opcional)" class="w-full border p-2 rounded text-sm mb-2">
                         <div class="flex gap-2">
-                            <input type="number" id="discount-input" placeholder="Desc." class="w-full border p-2 rounded text-sm">
-                            <input type="number" id="delivery-input" placeholder="Envío" class="w-full border p-2 rounded text-sm">
+                            <input type="number" id="discount-input" placeholder="Desc. ($)" class="w-full border p-2 rounded text-sm">
+                            <input type="number" id="delivery-input" placeholder="Envío ($)" class="w-full border p-2 rounded text-sm">
                         </div>
                         <div class="flex justify-between text-lg font-bold border-t pt-2">
                             <span>Total:</span>
                             <span id="cart-total">$0.00</span>
                         </div>
-                        <button onclick="processCheckout()" class="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700 transition">COBRAR</button>
+                        <button onclick="window.processCheckout()" id="btn-checkout" class="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700 transition flex justify-center gap-2">
+                            COBRAR
+                        </button>
                     </div>
                 </div>
             </div>
@@ -105,151 +155,705 @@
             <div id="view-inventory" class="h-full p-6 overflow-y-auto hidden">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold">Inventario</h2>
-                    <button onclick="toggleModal('modal-product')" class="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700"><i data-lucide="plus"></i> Nuevo</button>
+                    <button onclick="window.toggleModal('modal-product')" class="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 shadow-lg transition">
+                        <i data-lucide="plus"></i> Nuevo Producto
+                    </button>
                 </div>
-                <div class="bg-white rounded shadow overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-gray-100 text-sm text-gray-600">
-                            <tr>
-                                <th class="p-3">Producto</th>
-                                <th class="p-3">Categoría</th>
-                                <th class="p-3 text-right">Costo</th>
-                                <th class="p-3 text-right">Precio</th>
-                                <th class="p-3 text-center">Stock</th>
-                                <th class="p-3 text-right">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body">
-                            <!-- Filas de inventario -->
-                        </tbody>
-                    </table>
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-600">
+                                <tr>
+                                    <th class="p-4">Producto</th>
+                                    <th class="p-4">Categoría</th>
+                                    <th class="p-4 text-right">Costo</th>
+                                    <th class="p-4 text-right">Precio</th>
+                                    <th class="p-4 text-center">Stock</th>
+                                    <th class="p-4 text-right">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-gray-100">
+                                <!-- Filas de inventario -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <!-- VISTA HISTORIAL VENTAS -->
             <div id="view-orders" class="h-full p-6 overflow-y-auto hidden">
                 <h2 class="text-2xl font-bold mb-6">Historial de Ventas</h2>
-                <div class="bg-white rounded shadow overflow-x-auto">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-100 text-sm">
-                            <tr>
-                                <th class="p-3">ID</th>
-                                <th class="p-3">Fecha</th>
-                                <th class="p-3">Cliente</th>
-                                <th class="p-3 text-right">Total</th>
-                                <th class="p-3 text-center">Ver</th>
-                            </tr>
-                        </thead>
-                        <tbody id="orders-table-body">
-                            <!-- Ordenes -->
-                        </tbody>
-                    </table>
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-600">
+                                <tr>
+                                    <th class="p-4">ID</th>
+                                    <th class="p-4">Fecha</th>
+                                    <th class="p-4">Cliente</th>
+                                    <th class="p-4 text-right">Total</th>
+                                    <th class="p-4 text-center">Ver</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orders-table-body" class="divide-y divide-gray-100">
+                                <!-- Ordenes -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <!-- 3. VISTA DE FACTURA (Overlay completo para impresión) -->
-    <div id="invoice-view" class="fixed inset-0 bg-gray-800 z-[100] overflow-y-auto hidden flex flex-col items-center p-4">
+    <!-- 3. VISTA DE FACTURA -->
+    <div id="invoice-view" class="fixed inset-0 bg-gray-900/90 z-[100] overflow-y-auto hidden flex flex-col items-center p-4">
         <div class="w-full max-w-2xl bg-white shadow-2xl p-10 min-h-[600px] relative rounded-lg print:w-full print:shadow-none print:p-0" id="printable-area">
             
-            <!-- Botones de Acción (No se imprimen) -->
             <div class="absolute top-4 right-4 flex gap-2 print:hidden">
-                <button onclick="closeInvoice()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">Cerrar</button>
-                <button onclick="window.print()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1"><i data-lucide="printer"></i> Imprimir</button>
-                <button onclick="copyInvoiceLink()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"><i data-lucide="link"></i> Link</button>
+                <button onclick="window.closeInvoice()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-medium">Cerrar</button>
+                <button onclick="window.print()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1 font-medium"><i data-lucide="printer" class="w-4 h-4"></i> Imprimir</button>
+                <button onclick="window.copyInvoiceLink()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1 font-medium"><i data-lucide="link" class="w-4 h-4"></i> Link</button>
             </div>
 
-            <!-- Contenido Factura -->
-            <div class="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between">
+            <!-- Cabecera Factura -->
+            <div class="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
                 <div>
-                    <h1 class="text-4xl font-bold text-gray-900">FACTURA</h1>
-                    <p id="inv-id" class="text-gray-500 text-sm mt-1">#ID</p>
+                    <h1 class="text-4xl font-bold text-gray-900 tracking-tight">FACTURA</h1>
+                    <p id="inv-id" class="text-gray-500 text-sm mt-1 font-mono">#ID</p>
                 </div>
                 <div class="text-right">
-                    <h2 class="text-xl font-bold text-indigo-600">Mi Tienda</h2>
-                    <p class="text-sm text-gray-500">Dirección del negocio</p>
+                    <h2 class="text-xl font-bold text-indigo-600">Mi Tienda POS</h2>
+                    <p class="text-sm text-gray-500">Sistema de Ventas</p>
+                    <p class="text-sm text-gray-500">Estelí, Nicaragua</p>
                 </div>
             </div>
 
-            <div class="flex justify-between mb-8">
+            <div class="flex justify-between mb-8 bg-gray-50 p-4 rounded-lg">
                 <div>
                     <p class="text-xs uppercase font-bold text-gray-500">Cliente</p>
-                    <p id="inv-customer" class="text-lg font-bold">Nombre</p>
+                    <p id="inv-customer" class="text-lg font-bold text-gray-800">Nombre</p>
                 </div>
                 <div class="text-right">
-                    <p class="text-xs uppercase font-bold text-gray-500">Fecha</p>
-                    <p id="inv-date">00/00/0000</p>
+                    <p class="text-xs uppercase font-bold text-gray-500">Fecha de Emisión</p>
+                    <p id="inv-date" class="font-medium">00/00/0000</p>
                 </div>
             </div>
 
             <table class="w-full mb-8">
                 <thead>
-                    <tr class="border-b text-sm font-bold text-gray-600">
-                        <td class="py-2">Item</td>
-                        <td class="py-2 text-center">Cant</td>
-                        <td class="py-2 text-right">Precio</td>
-                        <td class="py-2 text-right">Total</td>
+                    <tr class="border-b-2 border-gray-100 text-sm font-bold text-gray-600 uppercase">
+                        <td class="py-3 pl-2">Descripción</td>
+                        <td class="py-3 text-center">Cant</td>
+                        <td class="py-3 text-right">Precio Unit.</td>
+                        <td class="py-3 text-right pr-2">Total</td>
                     </tr>
                 </thead>
-                <tbody id="inv-items" class="text-sm">
+                <tbody id="inv-items" class="text-sm text-gray-700">
                     <!-- Items -->
                 </tbody>
             </table>
 
-            <div class="flex justify-end border-t pt-4">
-                <div class="w-1/2 space-y-1 text-right">
-                    <div class="flex justify-between"><span>Subtotal:</span> <span id="inv-subtotal">$0.00</span></div>
-                    <div class="flex justify-between text-green-600 hidden" id="inv-row-disc"><span>Desc:</span> <span id="inv-disc">-$0.00</span></div>
+            <div class="flex justify-end border-t pt-6">
+                <div class="w-full md:w-1/2 space-y-2 text-right">
+                    <div class="flex justify-between text-gray-600"><span>Subtotal:</span> <span id="inv-subtotal" class="font-medium">$0.00</span></div>
+                    <div class="flex justify-between text-green-600 hidden" id="inv-row-disc"><span>Descuento:</span> <span id="inv-disc">-$0.00</span></div>
                     <div class="flex justify-between text-blue-600 hidden" id="inv-row-del"><span>Envío:</span> <span id="inv-del">+$0.00</span></div>
-                    <div class="flex justify-between text-xl font-bold mt-2 pt-2 border-t"><span>Total:</span> <span id="inv-total">$0.00</span></div>
+                    <div class="flex justify-between text-2xl font-extrabold mt-4 pt-4 border-t border-gray-200 text-gray-900"><span>Total:</span> <span id="inv-total">$0.00</span></div>
                 </div>
             </div>
             
-            <p class="mt-10 text-center text-xs text-gray-400">Gracias por su compra.</p>
+            <p class="mt-12 text-center text-xs text-gray-400">Gracias por su preferencia.</p>
         </div>
     </div>
 
     <!-- MODAL AGREGAR PRODUCTO -->
-    <div id="modal-product" class="fixed inset-0 bg-black/50 z-40 hidden flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Añadir/Editar Producto</h3>
-            <form id="product-form" class="space-y-3">
+    <div id="modal-product" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all">
+            <h3 class="text-xl font-bold mb-4 text-gray-800">Añadir Nuevo Producto</h3>
+            <form id="product-form" class="space-y-4">
                 <input type="hidden" name="id" id="prod-id">
-                <input required name="name" placeholder="Nombre Producto" class="w-full border p-2 rounded">
-                <div class="grid grid-cols-2 gap-2">
-                    <input required type="number" step="0.01" name="price" placeholder="Precio Venta" class="w-full border p-2 rounded">
-                    <input required type="number" step="0.01" name="cost" placeholder="Costo Unitario" class="w-full border p-2 rounded">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <input required type="number" name="stock" placeholder="Stock Inicial" class="w-full border p-2 rounded">
-                    <input required name="category" placeholder="Categoría" class="w-full border p-2 rounded">
-                </div>
-                <input name="imageUrl" placeholder="URL Imagen (Opcional)" class="w-full border p-2 rounded">
                 
-                <div class="flex gap-2 mt-4">
-                    <button type="button" onclick="toggleModal('modal-product')" class="flex-1 bg-gray-200 py-2 rounded">Cancelar</button>
-                    <button type="submit" class="flex-1 bg-green-600 text-white py-2 rounded">Guardar</button>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">Nombre del Producto</label>
+                    <input required name="name" placeholder="Ej: Camisa Polo Talla M" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Precio Venta ($)</label>
+                        <input required type="number" step="0.01" name="price" placeholder="0.00" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Costo ($)</label>
+                        <input required type="number" step="0.01" name="cost" placeholder="0.00" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Stock Inicial</label>
+                        <input required type="number" name="stock" placeholder="0" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 mb-1">Categoría</label>
+                        <input required name="category" placeholder="Ej: Ropa" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 mb-1">URL Imagen (Opcional)</label>
+                    <input name="imageUrl" placeholder="https://..." class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="window.toggleModal('modal-product')" class="flex-1 bg-gray-100 py-3 rounded-lg font-medium hover:bg-gray-200 transition">Cancelar</button>
+                    <button type="submit" id="btn-save-prod" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2">
+                        Guardar
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Scripts Modulares -->
-    <!-- IMPORTANTE: El orden importa y type="module" es clave -->
-    <script type="module" src="firebase-config.js"></script>
-    <script type="module" src="auth.js"></script>
-    <script type="module" src="app.js"></script>
+    <!-- JAVASCRIPT LÓGICA COMPLETA -->
+    <script type="module">
+        // ----------------------------------------------------
+        // 1. CONFIGURACIÓN FIREBASE Y LIBRERÍAS
+        // ----------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { 
+            getDatabase, ref, onValue, push, set, remove, get, child, runTransaction, off 
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { 
+            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut 
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-    <script>
-        // Funciones UI Globales simples (fuera de módulos para acceso HTML onclick)
-        function toggleModal(id) {
+        const firebaseConfig = {
+            apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
+            authDomain: "posdeventas-a03ca.firebaseapp.com",
+            databaseURL: "https://posdeventas-a03ca-default-rtdb.firebaseio.com",
+            projectId: "posdeventas-a03ca",
+            storageBucket: "posdeventas-a03ca.firebasestorage.app",
+            messagingSenderId: "975141670948",
+            appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const auth = getAuth(app);
+
+        // ----------------------------------------------------
+        // 2. ESTADO GLOBAL
+        // ----------------------------------------------------
+        let products = [];
+        let cart = [];
+        let currentOrder = null;
+        let currentUser = null;
+        
+        // Referencias a listeners para poder apagarlos al salir
+        let productsListener = null;
+        let ordersListener = null;
+
+        // Elementos UI
+        const authScreen = document.getElementById('auth-screen');
+        const appScreen = document.getElementById('app-screen');
+        const loadingScreen = document.getElementById('loading-screen');
+        
+        const grid = document.getElementById('product-grid');
+        const cartContainer = document.getElementById('cart-items');
+        const cartTotalEl = document.getElementById('cart-total');
+        const cartCountEl = document.getElementById('cart-count');
+        
+        const productForm = document.getElementById('product-form');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+
+        // ----------------------------------------------------
+        // 3. INICIALIZACIÓN Y AUTH
+        // ----------------------------------------------------
+        window.addEventListener('load', () => {
+            if(window.lucide) window.lucide.createIcons();
+            // Revisar URL por si es una factura compartida
+            checkUrlForInvoice();
+        });
+
+        // Manejador de Autenticación Principal
+        onAuthStateChanged(auth, (user) => {
+            loadingScreen.classList.add('hidden'); // Ocultar loader inicial
+            
+            if (user) {
+                console.log("Usuario autenticado:", user.email);
+                currentUser = user;
+                authScreen.classList.add('hidden');
+                
+                // Solo mostrar App si NO estamos en modo "Ver Factura pública"
+                const urlParams = new URLSearchParams(window.location.search);
+                if(!urlParams.get('orderId')) {
+                    appScreen.classList.remove('hidden');
+                    startAppListeners(); // IMPORTANTE: Iniciar listeners aquí
+                }
+            } else {
+                console.log("No hay usuario. Mostrando login.");
+                currentUser = null;
+                authScreen.classList.remove('hidden');
+                appScreen.classList.add('hidden');
+                stopAppListeners();
+            }
+        });
+
+        function checkUrlForInvoice() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('orderId');
+            if (orderId) {
+                // Modo Vista Factura
+                appScreen.classList.add('hidden');
+                window.loadInvoiceData(orderId);
+            }
+        }
+
+        // ----------------------------------------------------
+        // 4. LISTENERS DE BASE DE DATOS (Protegidos)
+        // ----------------------------------------------------
+        function startAppListeners() {
+            // Referencia Productos
+            const pRef = ref(db, 'products');
+            onValue(pRef, (snapshot) => {
+                const data = snapshot.val();
+                products = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
+                renderProducts();
+                renderInventory();
+            }, (error) => {
+                console.error("Error cargando productos:", error);
+                // No mostrar alerta molesta, solo log
+            });
+
+            // Referencia Ordenes
+            const oRef = ref(db, 'orders');
+            onValue(oRef, (snapshot) => {
+                const data = snapshot.val();
+                const orders = data ? Object.keys(data).map(key => ({id: key, ...data[key]})).reverse() : [];
+                renderOrdersHistory(orders);
+            });
+        }
+
+        function stopAppListeners() {
+            // Apagar listeners para evitar errores de permisos al hacer logout
+            const pRef = ref(db, 'products');
+            const oRef = ref(db, 'orders');
+            off(pRef);
+            off(oRef);
+            products = [];
+        }
+
+        // ----------------------------------------------------
+        // 5. RENDERIZADO UI
+        // ----------------------------------------------------
+        
+        // Renderizar Catálogo POS
+        function renderProducts() {
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filtered = products.filter(p => p.name.toLowerCase().includes(search));
+            
+            if(filtered.length === 0) {
+                grid.innerHTML = '<div class="col-span-full text-center text-gray-400 py-10">No se encontraron productos o inventario vacío.</div>';
+                return;
+            }
+
+            grid.innerHTML = filtered.map(p => `
+                <div class="bg-white rounded-xl shadow-sm hover:shadow-lg transition cursor-pointer border overflow-hidden group ${p.stock < 1 ? 'opacity-60 grayscale' : ''}" 
+                     onclick="window.addToCart('${p.id}')">
+                    <div class="h-40 bg-gray-100 flex items-center justify-center relative overflow-hidden">
+                        ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">` 
+                                     : '<i data-lucide="image" class="text-gray-300 w-12 h-12"></i>'}
+                        ${p.stock < 1 ? '<div class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold uppercase tracking-widest">Agotado</div>' : ''}
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-bold text-gray-800 text-sm truncate mb-1" title="${p.name}">${p.name}</h3>
+                        <p class="text-xs text-gray-500 mb-2">${p.category || 'General'}</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-indigo-600 font-extrabold text-lg">$${parseFloat(p.price).toFixed(2)}</span>
+                            <span class="text-xs font-medium px-2 py-1 rounded bg-gray-100 ${p.stock < 5 ? 'text-red-600 bg-red-50' : 'text-gray-600'}">
+                                Stock: ${p.stock}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Renderizar Tabla Inventario
+        function renderInventory() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = products.map(p => `
+                <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                    <td class="p-4 font-medium text-gray-800">${p.name}</td>
+                    <td class="p-4 text-sm text-gray-500">${p.category || '-'}</td>
+                    <td class="p-4 text-right text-gray-400 text-sm font-mono">$${parseFloat(p.cost).toFixed(2)}</td>
+                    <td class="p-4 text-right font-bold text-gray-700 font-mono">$${parseFloat(p.price).toFixed(2)}</td>
+                    <td class="p-4 text-center">
+                        <span class="px-2 py-1 rounded text-xs font-bold ${p.stock < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
+                            ${p.stock}
+                        </span>
+                    </td>
+                    <td class="p-4 text-right">
+                        <button onclick="window.deleteProduct('${p.id}')" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded transition" title="Eliminar">
+                           <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Renderizar Historial
+        function renderOrdersHistory(orders) {
+            const tbody = document.getElementById('orders-table-body');
+            tbody.innerHTML = orders.map(o => `
+                <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
+                    <td class="p-4 text-xs font-mono text-gray-400">...${o.id.slice(-6)}</td>
+                    <td class="p-4 text-sm text-gray-600">${o.dateString}</td>
+                    <td class="p-4 font-medium text-gray-800 text-sm">${o.customer || 'Consumidor Final'}</td>
+                    <td class="p-4 text-right font-bold text-indigo-600 font-mono">$${parseFloat(o.total).toFixed(2)}</td>
+                    <td class="p-4 text-center">
+                        <button onclick="window.showInvoice('${o.id}')" class="text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded text-sm font-bold transition">Ver</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Búsqueda
+        document.getElementById('search-input').addEventListener('input', renderProducts);
+
+        // ----------------------------------------------------
+        // 6. LÓGICA CARRITO Y VENTAS
+        // ----------------------------------------------------
+        
+        window.addToCart = (id) => {
+            const prod = products.find(p => p.id === id);
+            if (!prod || prod.stock < 1) return alert("Producto sin stock disponible.");
+            
+            const existing = cart.find(item => item.id === id);
+            
+            // Verificar stock en carrito vs real
+            const currentQtyInCart = existing ? existing.qty : 0;
+            if (currentQtyInCart + 1 > prod.stock) {
+                return alert(`Stock máximo alcanzado (${prod.stock}).`);
+            }
+
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ ...prod, qty: 1 });
+            }
+            renderCart();
+        };
+
+        window.removeFromCart = (index) => {
+            cart.splice(index, 1);
+            renderCart();
+        };
+
+        function renderCart() {
+            if (cart.length === 0) {
+                cartContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full text-gray-300">
+                        <i data-lucide="shopping-cart" class="w-12 h-12 mb-2 opacity-50"></i>
+                        <p class="text-sm">Carrito vacío</p>
+                    </div>`;
+                cartTotalEl.innerText = "$0.00";
+                cartCountEl.innerText = "0";
+                if(window.lucide) window.lucide.createIcons();
+                return;
+            }
+
+            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const disc = parseFloat(document.getElementById('discount-input').value) || 0;
+            const del = parseFloat(document.getElementById('delivery-input').value) || 0;
+            const total = Math.max(0, subtotal - disc + del);
+
+            cartTotalEl.innerText = `$${total.toFixed(2)}`;
+            cartCountEl.innerText = cart.reduce((acc, item) => acc + item.qty, 0);
+
+            cartContainer.innerHTML = cart.map((item, index) => `
+                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 group">
+                    <div class="overflow-hidden">
+                        <p class="font-bold text-sm text-gray-800 truncate pr-2">${item.name}</p>
+                        <p class="text-xs text-indigo-600 font-mono">$${item.price} x ${item.qty} = <strong>$${(item.price * item.qty).toFixed(2)}</strong></p>
+                    </div>
+                    <button onclick="window.removeFromCart(${index})" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition">
+                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `).join('');
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Listeners para recalcular totales
+        document.getElementById('discount-input').addEventListener('input', renderCart);
+        document.getElementById('delivery-input').addEventListener('input', renderCart);
+
+        // COBRAR Y GUARDAR VENTA
+        window.processCheckout = async () => {
+            if (cart.length === 0) return alert("El carrito está vacío.");
+            if (!confirm("¿Confirmar y procesar venta?")) return;
+
+            const btn = document.getElementById('btn-checkout');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<div class="loader w-5 h-5 border-2 border-white/50 border-t-white"></div> Procesando...';
+            btn.disabled = true;
+
+            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+            const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+            const delivery = parseFloat(document.getElementById('delivery-input').value) || 0;
+            const total = subtotal - discount + delivery;
+            const totalCost = cart.reduce((acc, item) => acc + (item.cost * item.qty), 0);
+            const customer = document.getElementById('customer-name').value || 'Consumidor Final';
+
+            const newOrder = {
+                items: cart,
+                subtotal, discount, delivery, total, totalCost, customer,
+                sellerId: currentUser.uid,
+                sellerEmail: currentUser.email,
+                date: new Date().toISOString(),
+                dateString: new Date().toLocaleString()
+            };
+
+            try {
+                // 1. Descontar Stock con Transacción (Atómica)
+                // Si falla uno, fallan todos idealmente, pero aquí hacemos loop.
+                // En producción real, usaríamos una sola actualización multipath si fuera posible,
+                // pero runTransaction por item es seguro para stock individual.
+                const updates = cart.map(item => {
+                    const stockRef = ref(db, `products/${item.id}/stock`);
+                    return runTransaction(stockRef, (currentStock) => {
+                        if (currentStock === null) return 0; // Si no existe
+                        if (currentStock < item.qty) throw new Error(`Stock insuficiente para ${item.name}`);
+                        return currentStock - item.qty;
+                    });
+                });
+
+                await Promise.all(updates);
+
+                // 2. Crear Orden
+                const newRef = await push(ref(db, 'orders'), newOrder);
+                
+                // 3. Limpiar
+                cart = [];
+                document.getElementById('customer-name').value = '';
+                document.getElementById('discount-input').value = '';
+                document.getElementById('delivery-input').value = '';
+                renderCart();
+                
+                // 4. Mostrar Factura
+                window.showInvoice(newRef.key);
+
+            } catch (error) {
+                console.error("Error en venta:", error);
+                alert("Error procesando la venta: " + error.message);
+                // Aquí podrías implementar rollback si es crítico
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        };
+
+        // ----------------------------------------------------
+        // 7. GESTIÓN DE PRODUCTOS
+        // ----------------------------------------------------
+        
+        productForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-save-prod');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Guardando...';
+            btn.disabled = true;
+
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            // Conversiones Numéricas Seguras
+            data.price = parseFloat(data.price) || 0;
+            data.cost = parseFloat(data.cost) || 0;
+            data.stock = parseInt(data.stock) || 0;
+
+            if(!currentUser) {
+                alert("Debes iniciar sesión para guardar productos.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                return;
+            }
+
+            try {
+                // Usamos push() para generar ID único automáticamente
+                await push(ref(db, 'products'), data);
+                
+                window.toggleModal('modal-product');
+                productForm.reset();
+                alert("¡Producto guardado correctamente!");
+            } catch (error) {
+                console.error("Error guardando producto:", error);
+                alert("Error al guardar: Verifique su conexión o permisos.\n" + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        });
+
+        window.deleteProduct = async (id) => {
+            if(!confirm("¿Está seguro de eliminar este producto? Esta acción no se puede deshacer.")) return;
+            try {
+                await remove(ref(db, `products/${id}`));
+                // No hace falta alert, se actualiza la UI sola por el listener
+            } catch (error) {
+                alert("Error eliminando: " + error.message);
+            }
+        };
+
+        // ----------------------------------------------------
+        // 8. AUTENTICACIÓN
+        // ----------------------------------------------------
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-pass').value;
+            const btn = document.getElementById('btn-login-submit');
+            
+            btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white/50 border-t-white"></div>';
+            
+            signInWithEmailAndPassword(auth, email, pass)
+                .then(() => {
+                    loginForm.reset();
+                    // Auth state change manejará la UI
+                })
+                .catch((error) => {
+                    alert("Error de inicio de sesión: " + error.message);
+                })
+                .finally(() => {
+                    btn.innerHTML = 'Entrar';
+                });
+        });
+
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+
+            createUserWithEmailAndPassword(auth, email, pass)
+                .then(() => {
+                    alert("Usuario creado exitosamente. Ingresando...");
+                    registerForm.reset();
+                })
+                .catch((error) => alert("Error registro: " + error.message));
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            if(confirm("¿Cerrar sesión?")) signOut(auth);
+        });
+
+        // Alternar formularios
+        document.getElementById('show-register-btn').addEventListener('click', () => {
+            document.getElementById('login-form').classList.add('hidden');
+            registerForm.classList.remove('hidden');
+        });
+        document.getElementById('cancel-reg-btn').addEventListener('click', () => {
+            registerForm.classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        });
+
+        // ----------------------------------------------------
+        // 9. FUNCIONES UI GLOBALES
+        // ----------------------------------------------------
+        window.switchView = (viewName) => {
+            ['pos', 'inventory', 'orders'].forEach(v => {
+                document.getElementById(`view-${v}`).classList.add('hidden');
+                document.getElementById(`nav-${v}`).classList.remove('bg-indigo-600', 'text-white');
+            });
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.getElementById(`nav-${viewName}`).classList.add('bg-indigo-600', 'text-white');
+        };
+
+        window.toggleModal = (id) => {
             const el = document.getElementById(id);
             if(el) el.classList.toggle('hidden');
+        };
+
+        // Lógica Factura
+        window.loadInvoiceData = async (orderId) => {
+            try {
+                const snapshot = await get(child(ref(db), `orders/${orderId}`));
+                if (snapshot.exists()) {
+                    currentOrder = { id: snapshot.key, ...snapshot.val() };
+                    renderInvoiceOverlay();
+                } else {
+                    alert("Orden no encontrada");
+                }
+            } catch (error) {
+                console.error(error);
+                alert("Error cargando factura");
+            }
+        };
+
+        window.showInvoice = (orderId) => {
+            loadInvoiceData(orderId);
+        };
+
+        function renderInvoiceOverlay() {
+            if(!currentOrder) return;
+            
+            document.getElementById('inv-id').innerText = `ORDEN #${currentOrder.id.slice(-8).toUpperCase()}`;
+            document.getElementById('inv-customer').innerText = currentOrder.customer;
+            document.getElementById('inv-date').innerText = currentOrder.dateString;
+            
+            document.getElementById('inv-items').innerHTML = currentOrder.items.map(item => `
+                <tr class="border-b border-gray-100 last:border-0">
+                    <td class="py-3 pl-2">${item.name}</td>
+                    <td class="py-3 text-center">${item.qty}</td>
+                    <td class="py-3 text-right">$${parseFloat(item.price).toFixed(2)}</td>
+                    <td class="py-3 text-right pr-2 font-medium">$${(item.price * item.qty).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('inv-subtotal').innerText = `$${currentOrder.subtotal.toFixed(2)}`;
+            document.getElementById('inv-total').innerText = `$${currentOrder.total.toFixed(2)}`;
+
+            const discRow = document.getElementById('inv-row-disc');
+            if(currentOrder.discount > 0) {
+                discRow.classList.remove('hidden');
+                document.getElementById('inv-disc').innerText = `-$${currentOrder.discount.toFixed(2)}`;
+            } else {
+                discRow.classList.add('hidden');
+            }
+
+            const delRow = document.getElementById('inv-row-del');
+            if(currentOrder.delivery > 0) {
+                delRow.classList.remove('hidden');
+                document.getElementById('inv-del').innerText = `+$${currentOrder.delivery.toFixed(2)}`;
+            } else {
+                delRow.classList.add('hidden');
+            }
+
+            document.getElementById('invoice-view').classList.remove('hidden');
         }
+
+        window.closeInvoice = () => {
+            document.getElementById('invoice-view').classList.add('hidden');
+            const urlParams = new URLSearchParams(window.location.search);
+            if(urlParams.get('orderId')) {
+                // Limpiar URL si estábamos en modo solo ver
+                window.location.href = window.location.pathname;
+            }
+        };
+
+        window.copyInvoiceLink = () => {
+            if(!currentOrder) return;
+            const url = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
+            navigator.clipboard.writeText(url);
+            alert("Enlace copiado al portapapeles:\n" + url);
+        };
+
     </script>
 </body>
 </html>
-
 
