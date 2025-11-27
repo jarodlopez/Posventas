@@ -2,912 +2,1208 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POS Delivery & WhatsApp</title>
-    <!-- Tailwind CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS Sistema de Ventas (Unificado)</title>
+    <!-- Tailwind CSS (Diseño rápido) -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Iconos Lucide -->
+    <!-- Iconos -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-        
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        /* Estilos Propios de style.css */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
 
-        /* Ajustes Mobile */
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-        .hide-scroll::-webkit-scrollbar { display: none; }
-        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+        body { font-family: 'Inter', sans-serif; }
 
-        /* Animaciones */
-        .fade-in { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Estilos de Scrollbar más bonitos */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
 
-        /* Loader */
-        .loader {
-            border: 3px solid #f3f3f3; border-top: 3px solid #6366f1;
-            border-radius: 50%; width: 24px; height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        /* Estilos Inputs Móviles */
-        input, select, textarea { font-size: 16px !important; } /* Evita zoom en iOS */
-
-        /* IMPRESIÓN */
+        /* REGLAS CRÍTICAS PARA IMPRESIÓN */
         @media print {
-            body > *:not(#invoice-view) { display: none !important; }
-            #invoice-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: white; display: block !important; padding: 0; }
-            .no-print { display: none !important; }
-            #invoice-card { box-shadow: none !important; border: none !important; width: 100% !important; }
+            /* Ocultar todo lo que no sea la factura */
+            body > *:not(#invoice-view) {
+                display: none !important;
+            }
+
+            #invoice-view {
+                position: absolute;
+                top: 0; left: 0;
+                width: 100%;
+                height: 100%;
+                background: white;
+                display: block !important;
+                overflow: visible;
+                padding: 0;
+                margin: 0;
+                z-index: 9999;
+            }
+
+            #printable-area {
+                box-shadow: none;
+                max-width: 100%;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+            }
+
+            /* Ocultar botones dentro de la vista de factura */
+            .print\:hidden {
+                display: none !important;
+            }
         }
-        
-        .input-field { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all; background: #f9fafb; }
-        .input-field:focus { border-color: #6366f1; background: white; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
-        .label-input { display: block; font-size: 0.75rem; font-weight: 700; color: #4b5563; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
+<body class="bg-gray-100 text-gray-900 font-sans overflow-hidden">
 
-    <!-- LOGIN SCREEN -->
-    <div id="auth-screen" class="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-6 hidden">
-        <div class="w-full max-w-sm">
-            <div class="text-center mb-8">
-                <div class="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
-                    <i data-lucide="store" class="text-white w-8 h-8"></i>
-                </div>
-                <h1 class="text-3xl font-bold text-gray-900">Bienvenido</h1>
-                <p class="text-gray-500 mt-2">Gestión de Ventas y Delivery</p>
-            </div>
+    <!-- Toast Container para mensajes -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] space-y-2"></div>
 
+    <!-- 1. PANTALLA DE LOGIN (Se muestra si no hay usuario) -->
+    <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 class="text-3xl font-bold text-center mb-6 text-indigo-600">POS Login</h2>
+            
             <form id="login-form" class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Correo</label>
-                    <input type="email" id="login-email" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="login-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                    <input type="password" id="login-pass" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
+                    <input type="password" id="login-pass" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
                 </div>
-                <button type="submit" id="btn-login" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
-                    Ingresar
-                </button>
+                <button type="submit" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold hover:bg-indigo-700 transition duration-150">Ingresar</button>
             </form>
-            <button id="toggle-auth" class="mt-6 text-sm text-indigo-600 font-medium w-full text-center py-2">¿No tienes cuenta? Regístrate</button>
-        </div>
-    </div>
 
-    <!-- MAIN APP LAYOUT -->
-    <div id="app-screen" class="flex-1 flex flex-col md:flex-row h-full relative hidden">
-
-        <!-- DESKTOP SIDEBAR -->
-        <nav class="hidden md:flex w-64 bg-white border-r flex-col p-4 z-20">
-            <div class="flex items-center gap-3 px-2 mb-8 mt-2">
-                <div class="bg-indigo-600 p-2 rounded-lg"><i data-lucide="zap" class="text-white w-5 h-5"></i></div>
-                <span class="font-bold text-xl">QuickPOS</span>
-            </div>
-            
-            <div class="space-y-1">
-                <button onclick="navTo('pos')" id="d-nav-pos" class="nav-item-d w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
-                    <i data-lucide="layout-grid" class="w-5 h-5"></i> Ventas
-                </button>
-                <button onclick="navTo('inventory')" id="d-nav-inventory" class="nav-item-d w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
-                    <i data-lucide="package" class="w-5 h-5"></i> Inventario
-                </button>
-                <button onclick="navTo('orders')" id="d-nav-orders" class="nav-item-d w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
-                    <i data-lucide="history" class="w-5 h-5"></i> Historial
-                </button>
-            </div>
-
-            <div class="mt-auto">
-                <div class="bg-gray-50 p-3 rounded-xl mb-4">
-                    <p id="user-email-display" class="text-xs text-gray-500 truncate font-medium">usuario@email.com</p>
-                </div>
-                <button id="btn-logout" class="w-full flex items-center gap-2 text-red-500 px-4 py-2 hover:bg-red-50 rounded-lg transition text-sm font-bold">
-                    <i data-lucide="log-out" class="w-4 h-4"></i> Salir
-                </button>
-            </div>
-        </nav>
-
-        <!-- MAIN CONTENT -->
-        <main class="flex-1 relative overflow-hidden bg-gray-50 flex flex-col">
-            
-            <!-- VIEW: POS -->
-            <div id="view-pos" class="absolute inset-0 flex flex-col md:flex-row fade-in">
-                <!-- Mobile Header -->
-                <div class="md:hidden bg-white p-4 flex items-center justify-between border-b shadow-sm z-10">
-                    <h1 class="font-bold text-lg text-indigo-900">Punto de Venta</h1>
-                    <div class="relative" onclick="navTo('cart')">
-                        <i data-lucide="shopping-cart" class="text-gray-700 w-6 h-6"></i>
-                        <span id="badge-cart-mobile" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden">0</span>
-                    </div>
-                </div>
-
-                <!-- Products Area -->
-                <div class="flex-1 flex flex-col overflow-hidden">
-                    <div class="p-4 pb-2">
-                        <div class="relative">
-                            <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
-                            <input type="text" id="search-pos" placeholder="Buscar producto, marca o SKU..." class="w-full bg-white border-none shadow-sm rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none">
-                        </div>
-                    </div>
-                    <div id="pos-grid" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4">
-                        <!-- JS Injected -->
-                    </div>
-                </div>
-
-                <!-- Desktop Cart Sidebar -->
-                <div class="hidden md:flex w-96 bg-white border-l flex-col shadow-xl z-20">
-                    <div class="p-5 border-b bg-gray-50 flex justify-between items-center">
-                        <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="shopping-cart"></i> Ticket</h2>
-                        <button onclick="clearCart()" class="text-xs text-red-500 font-medium hover:underline">Vaciar</button>
-                    </div>
-                    <div id="cart-items-desktop" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
-                    <div class="p-5 bg-gray-50 border-t space-y-3">
-                        <div id="cart-summary-desktop"></div>
-                        <button onclick="openCheckoutModal()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">PROCESAR VENTA</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- VIEW: CART (Mobile Only) -->
-            <div id="view-cart" class="absolute inset-0 flex flex-col bg-white z-30 hidden fade-in md:hidden">
-                <div class="p-4 border-b flex items-center justify-between bg-white shadow-sm sticky top-0 z-10">
-                    <h1 class="font-bold text-xl">Carrito</h1>
-                    <button onclick="clearCart()" class="text-red-500 text-sm font-medium">Limpiar</button>
-                </div>
-                <div id="cart-items-mobile" class="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
-                    <!-- JS Injected -->
-                </div>
-                <div class="absolute bottom-[60px] left-0 w-full bg-white border-t p-4 shadow-lg">
-                     <div class="space-y-2 mb-3">
-                        <div class="flex justify-between text-sm"><span>Subtotal</span> <span id="m-subtotal">C$0.00</span></div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm text-gray-500">Descuento</span>
-                            <input type="number" id="m-discount" class="w-20 text-right border rounded p-1 text-sm bg-gray-50" placeholder="0.00">
-                        </div>
-                        <div class="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t"><span>Total</span> <span id="m-total">C$0.00</span></div>
-                    </div>
-                    <!-- Botón de Cobro Corregido -->
-                    <button onclick="openCheckoutModal()" class="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition">
-                        Cobrar y Facturar
-                    </button>
-                </div>
-            </div>
-
-            <!-- VIEW: INVENTORY -->
-            <div id="view-inventory" class="absolute inset-0 flex flex-col hidden fade-in bg-gray-50">
-                <div class="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                    <h1 class="font-bold text-lg md:text-2xl">Inventario</h1>
-                    <button onclick="openProductModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 transition shadow-md">
-                        <i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden md:inline">Nuevo Producto</span><span class="md:hidden">Nuevo</span>
-                    </button>
-                </div>
-                <div class="p-4 flex-1 overflow-y-auto pb-24">
-                    <div id="inventory-list" class="space-y-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:space-y-0 md:gap-4">
-                        <!-- JS Injected -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- VIEW: ORDERS -->
-            <div id="view-orders" class="absolute inset-0 flex flex-col hidden fade-in bg-gray-50">
-                <div class="p-4 bg-white border-b sticky top-0 z-10 shadow-sm">
-                    <h1 class="font-bold text-lg md:text-2xl">Historial</h1>
-                </div>
-                <div id="orders-list" class="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
-                    <!-- JS Injected -->
-                </div>
-            </div>
-        </main>
-
-        <!-- MOBILE BOTTOM NAV -->
-        <div class="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around items-center py-2 pb-safe z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-            <button onclick="navTo('pos')" id="m-nav-pos" class="flex flex-col items-center p-2 text-indigo-600 transition"><i data-lucide="store" class="w-6 h-6 mb-1"></i><span class="text-[10px] font-medium">Ventas</span></button>
-            <button onclick="navTo('cart')" id="m-nav-cart" class="flex flex-col items-center p-2 text-gray-400 transition relative">
-                <i data-lucide="shopping-cart" class="w-6 h-6 mb-1"></i>
-                <span id="badge-nav" class="absolute top-1 right-2 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center hidden">0</span>
-                <span class="text-[10px] font-medium">Carrito</span>
-            </button>
-            <button onclick="navTo('inventory')" id="m-nav-inventory" class="flex flex-col items-center p-2 text-gray-400 transition"><i data-lucide="package" class="w-6 h-6 mb-1"></i><span class="text-[10px] font-medium">Stock</span></button>
-            <button onclick="navTo('orders')" id="m-nav-orders" class="flex flex-col items-center p-2 text-gray-400 transition"><i data-lucide="file-clock" class="w-6 h-6 mb-1"></i><span class="text-[10px] font-medium">Historial</span></button>
-        </div>
-    </div>
-
-    <!-- MODAL PRODUCTO -->
-    <div id="modal-product" class="fixed inset-0 z-50 bg-black/50 hidden flex items-end md:items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full md:w-[600px] h-[90vh] md:h-auto rounded-t-2xl md:rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-slide-up">
-            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
-                <h3 class="font-bold text-lg" id="modal-title">Gestión Producto</h3>
-                <button onclick="closeProductModal()" class="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><i data-lucide="x" class="w-4 h-4"></i></button>
-            </div>
-            <div class="flex-1 overflow-y-auto p-6">
-                <form id="product-form" class="space-y-4">
-                    <input type="hidden" name="id" id="prod-id">
-                    <div>
-                        <label class="label-input">Nombre del Producto *</label>
-                        <input name="name" required class="input-field" placeholder="Ej: Camiseta Polo">
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="label-input">Marca</label>
-                            <input name="brand" class="input-field" placeholder="Ej: Nike">
-                        </div>
-                        <div>
-                            <label class="label-input">Categoría</label>
-                            <input name="category" list="categories" class="input-field" placeholder="Ej: Ropa">
-                            <datalist id="categories"><option value="Ropa"><option value="Calzado"><option value="Electrónica"></datalist>
-                        </div>
-                    </div>
-                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 grid grid-cols-3 gap-3">
-                        <!-- SKU/Código de Producto Añadido -->
-                        <div>
-                            <label class="label-input text-indigo-900">SKU/Cód.</label>
-                            <input name="sku" required class="input-field border-indigo-200" placeholder="A-100-M">
-                        </div>
-                        <div>
-                            <label class="label-input text-indigo-900">Costo (C$)</label>
-                            <input type="number" step="0.01" name="cost" required class="input-field border-indigo-200" placeholder="0.00">
-                        </div>
-                        <div>
-                            <label class="label-input text-indigo-900">Precio Venta (C$)</label>
-                            <input type="number" step="0.01" name="price" required class="input-field border-indigo-200 font-bold" placeholder="0.00">
-                        </div>
-                        <div class="col-span-3">
-                            <label class="label-input text-indigo-900">Stock</label>
-                            <input type="number" name="stock" required class="input-field border-indigo-200" placeholder="0">
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div><label class="label-input">Color</label><input name="color" class="input-field" placeholder="Ej: Rojo"></div>
-                        <div><label class="label-input">Talla</label><input name="size" class="input-field" placeholder="Ej: M"></div>
-                    </div>
-                    <div>
-                        <label class="label-input">Imagen URL</label>
-                        <input name="imageUrl" class="input-field" placeholder="https://...">
-                    </div>
-                </form>
-            </div>
-            <div class="p-4 border-t bg-gray-50 flex gap-3">
-                <button onclick="closeProductModal()" class="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-gray-600">Cancelar</button>
-                <button onclick="submitProduct()" class="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CHECKOUT (DATOS DE ENTREGA) -->
-    <div id="modal-checkout" class="fixed inset-0 z-50 bg-black/50 hidden flex items-end md:items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full md:w-[500px] rounded-t-2xl md:rounded-2xl flex flex-col shadow-2xl overflow-hidden">
-            <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                <h3 class="font-bold text-lg flex items-center gap-2"><i data-lucide="truck" class="w-5 h-5"></i> Detalles de Venta</h3>
-                <button onclick="document.getElementById('modal-checkout').classList.add('hidden')" class="p-1 rounded-full hover:bg-gray-200"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            <div class="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
-                
-                <!-- Tipo de Entrega -->
+            <form id="register-form" class="space-y-4 hidden">
                 <div>
-                    <label class="label-input">Tipo de Entrega</label>
-                    <div class="grid grid-cols-2 gap-3 mt-1">
-                        <label class="cursor-pointer">
-                            <input type="radio" name="deliveryType" value="tienda" class="peer sr-only" checked onchange="toggleDeliveryFields()">
-                            <div class="p-3 border rounded-xl text-center peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 transition">
-                                <i data-lucide="store" class="w-5 h-5 mx-auto mb-1"></i> Retiro en Tienda
-                            </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="deliveryType" value="delivery" class="peer sr-only" onchange="toggleDeliveryFields()">
-                            <div class="p-3 border rounded-xl text-center peer-checked:bg-indigo-600 peer-checked:text-white peer-checked:border-indigo-600 transition">
-                                <i data-lucide="bike" class="w-5 h-5 mx-auto mb-1"></i> Delivery
-                            </div>
-                        </label>
-                    </div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="reg-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
                 </div>
-
-                <!-- Datos Cliente -->
-                <div class="space-y-3">
-                    <div>
-                        <label class="label-input">Nombre del Cliente *</label>
-                        <input id="checkout-name" class="input-field" placeholder="Nombre completo">
-                    </div>
-                    <div>
-                        <label class="label-input">Teléfono / WhatsApp *</label>
-                        <div class="flex">
-                            <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+505</span>
-                            <input type="tel" id="checkout-phone" class="input-field rounded-l-none" placeholder="8888 7777">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Dirección (Oculto si es Tienda) -->
-                <div id="delivery-details" class="hidden space-y-3 p-3 bg-gray-50 rounded-xl border">
-                    <div>
-                        <label class="label-input">Dirección de Entrega</label>
-                        <textarea id="checkout-address" rows="2" class="input-field resize-none" placeholder="Barrio, calle, número de casa, referencias..."></textarea>
-                    </div>
-                    <div>
-                        <label class="label-input">Costo de Envío Adicional (C$)</label>
-                        <input type="number" id="checkout-shipping" value="0" class="input-field bg-white" oninput="updateCheckoutTotal()">
-                    </div>
-                </div>
-
-                <!-- Método de Pago -->
                 <div>
-                    <label class="label-input">Método de Pago</label>
-                    <select id="checkout-payment" class="input-field appearance-none bg-white">
-                        <option value="Efectivo">💵 Efectivo</option>
-                        <option value="Transferencia">🏦 Transferencia / Depósito</option>
-                        <option value="Tarjeta">💳 Tarjeta de Crédito/Débito</option>
+                    <label class="block text-sm font-medium text-gray-700">Contraseña (Mín. 6)</label>
+                    <input type="password" id="reg-pass" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700 transition duration-150">Registrar Cuenta</button>
+                <button type="button" id="cancel-reg-btn" class="w-full mt-2 text-sm text-gray-500 hover:text-gray-700">Cancelar</button>
+            </form>
+
+            <div class="mt-6 text-center">
+                <button id="show-register-btn" class="text-sm text-indigo-600 hover:text-indigo-800 transition duration-150">¿No tienes cuenta? Regístrate</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- 2. APLICACIÓN PRINCIPAL (Se muestra si hay usuario) -->
+    <div id="app-screen" class="h-screen flex flex-col hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-md p-4 flex justify-between items-center z-10">
+            <h1 class="text-2xl font-bold text-indigo-700">POS Simple</h1>
+            <div class="flex items-center space-x-4">
+                <button onclick="toggleTab('products-view')" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition duration-150" title="Productos">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
+                </button>
+                <button onclick="toggleTab('inventory-view')" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition duration-150" title="Inventario">
+                    <i data-lucide="clipboard-list" class="w-6 h-6"></i>
+                </button>
+                <button onclick="toggleTab('orders-view')" class="p-2 rounded-full text-gray-600 hover:bg-gray-100 transition duration-150" title="Órdenes">
+                    <i data-lucide="history" class="w-6 h-6"></i>
+                </button>
+                <span id="user-info" class="text-sm text-gray-600"></span>
+                <button id="logout-btn" class="flex items-center space-x-1 bg-red-100 text-red-600 px-3 py-1 rounded-full hover:bg-red-200 transition duration-150">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                    <span>Salir</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Contenido principal: 3 columnas -->
+        <main class="flex-1 flex overflow-hidden">
+            
+            <!-- Columna 1: Productos (Vista de Venta) -->
+            <div id="products-view" class="flex-1 flex flex-col p-4 overflow-y-auto bg-white">
+                <div class="flex space-x-2 mb-4">
+                    <input id="search-input" type="text" placeholder="Buscar productos..." class="flex-1 border p-2 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    <select id="category-filter" class="border p-2 rounded-lg">
+                        <option value="">Todas las categorías</option>
                     </select>
+                    <button onclick="toggleModal('modal-product'); resetProductForm();" class="bg-indigo-600 text-white p-2 rounded-lg hover:bg-indigo-700 transition duration-150 flex items-center space-x-1">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>Añadir Producto</span>
+                    </button>
+                </div>
+                
+                <!-- Grid de Productos -->
+                <div id="product-grid" class="flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 overflow-y-auto pb-4">
+                    <!-- Los productos se inyectan aquí -->
+                    <p class="text-center text-gray-500 col-span-full">Cargando productos...</p>
+                </div>
+            </div>
+
+            <!-- Columna 2: Inventario (Vista de Gestión) -->
+            <div id="inventory-view" class="flex-1 p-4 overflow-y-auto hidden">
+                <h2 class="text-2xl font-semibold mb-4 text-indigo-700">Inventario y Precios</h2>
+                <div class="bg-white shadow-lg rounded-xl overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Precio Venta</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Filas de inventario se inyectan aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Columna 3: Historial de Órdenes -->
+            <div id="orders-view" class="flex-1 p-4 overflow-y-auto hidden">
+                <h2 class="text-2xl font-semibold mb-4 text-indigo-700">Historial de Órdenes de Venta</h2>
+                <div class="bg-white shadow-lg rounded-xl overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendió</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="orders-table-body" class="bg-white divide-y divide-gray-200">
+                            <!-- Filas de órdenes se inyectan aquí -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Columna 3 (Original): Carrito de Compras -->
+            <div class="w-full md:w-96 bg-gray-50 border-l flex flex-col">
+                <div class="p-4 border-b">
+                    <h2 class="text-xl font-bold flex justify-between items-center">
+                        Carrito <span id="cart-count" class="bg-indigo-600 text-white text-xs font-medium px-2 py-0.5 rounded-full">0</span>
+                    </h2>
+                </div>
+                
+                <!-- Items en el Carrito -->
+                <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-3">
+                    <p class="text-gray-500 text-sm text-center">Añada productos para comenzar una venta.</p>
                 </div>
 
-                <div class="pt-4 border-t flex justify-between items-center">
-                    <span class="text-sm text-gray-500">Total a Pagar:</span>
-                    <span id="checkout-total-display" class="text-2xl font-bold text-indigo-700">C$0.00</span>
+                <!-- Totales y Botón de Checkout -->
+                <div class="p-4 bg-white border-t space-y-2">
+                    <div class="flex justify-between font-medium text-sm">
+                        <span>Subtotal:</span>
+                        <span id="cart-subtotal">$0.00</span>
+                    </div>
+                    <div class="flex justify-between font-medium text-sm">
+                        <span>Impuestos (IVA 15%):</span>
+                        <span id="cart-tax">$0.00</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-lg text-indigo-700">
+                        <span>TOTAL:</span>
+                        <span id="cart-total">$0.00</span>
+                    </div>
+
+                    <div class="flex space-x-2 pt-2">
+                        <button onclick="clearCart()" class="flex-1 py-3 px-4 rounded-lg border text-red-600 font-semibold hover:bg-red-50 transition duration-150">
+                            <i data-lucide="trash-2" class="w-5 h-5 inline mr-1"></i>
+                        </button>
+                        <!-- Botón Cobrar y Facturar (CRÍTICO) -->
+                        <button id="checkout-btn" onclick="toggleModal('modal-checkout')" disabled class="flex-1 bg-indigo-600 text-white py-3 px-4 rounded-lg font-bold hover:bg-indigo-700 transition duration-150 disabled:bg-indigo-300">
+                            Cobrar y Facturar
+                        </button>
+                    </div>
                 </div>
             </div>
-            <div class="p-4 bg-gray-50 border-t">
-                <button onclick="confirmTransaction()" class="w-full bg-green-600 text-white py-3.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 hover:bg-green-700 transition">
-                    <i data-lucide="check-circle" class="w-5 h-5"></i> Confirmar Venta
-                </button>
-            </div>
-        </div>
+
+        </main>
     </div>
 
-    <!-- FACTURA FINAL CON OPCIONES WHATSAPP -->
-    <div id="invoice-view" class="fixed inset-0 bg-gray-100 z-[100] hidden overflow-y-auto">
-        <div class="max-w-xl mx-auto min-h-screen bg-white shadow-2xl relative" id="invoice-card">
+    <!-- 3. MODAL: Agregar/Editar Producto -->
+    <div id="modal-product" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 hidden">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 id="product-modal-title" class="text-2xl font-bold mb-4">Añadir Nuevo Producto</h2>
+            <form id="product-form" class="space-y-3">
+                <input type="hidden" id="product-id">
+                
+                <input required name="name" placeholder="Nombre del Producto" class="w-full border p-2 rounded-lg">
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <input required type="number" step="0.01" name="price" placeholder="Precio de Venta" class="w-full border p-2 rounded-lg">
+                    <input required type="number" step="0.01" name="cost" placeholder="Costo Unitario" class="w-full border p-2 rounded-lg">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input required type="number" name="stock" placeholder="Stock Inicial" class="w-full border p-2 rounded-lg">
+                    <input required name="category" placeholder="Categoría" class="w-full border p-2 rounded-lg">
+                </div>
+                <input name="imageUrl" placeholder="URL Imagen (Opcional)" class="w-full border p-2 rounded-lg">
+                
+                <div class="flex gap-2 mt-4">
+                    <button type="button" onclick="toggleModal('modal-product')" class="flex-1 bg-gray-200 py-2 rounded-lg font-semibold hover:bg-gray-300">Cancelar</button>
+                    <button type="submit" id="submit-product-btn" class="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold hover:bg-green-700">Guardar Producto</button>
+                    <button type="button" id="delete-product-btn" onclick="deleteProduct()" class="bg-red-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-600 hidden">Eliminar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 4. MODAL: Checkout/Cobro -->
+    <div id="modal-checkout" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-40 hidden">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold mb-6 text-indigo-700">Detalles de Cobro</h2>
             
-            <!-- Barra Superior (No Imprimible) -->
-            <div class="no-print bg-gray-800 p-4 sticky top-0 z-20 flex justify-between items-center text-white">
-                <h2 class="font-bold flex items-center gap-2"><i data-lucide="check-circle" class="text-green-400"></i> Venta Exitosa</h2>
-                <button onclick="closeInvoice()" class="p-1 hover:bg-gray-700 rounded"><i data-lucide="x" class="w-6 h-6"></i></button>
-            </div>
-
-            <!-- Contenido Factura -->
-            <div class="p-8 print:p-0" id="printable-area">
-                <div class="text-center border-b pb-6 mb-6">
-                    <div class="inline-block p-3 bg-indigo-600 rounded-full mb-3 print:hidden">
-                        <i data-lucide="shopping-bag" class="text-white w-6 h-6"></i>
+            <form id="checkout-form" class="space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Descuento (%)</label>
+                        <input type="number" id="checkout-discount-percent" value="0" min="0" max="100" class="w-full border p-2 rounded-lg">
                     </div>
-                    <h1 class="text-2xl font-bold uppercase tracking-widest text-gray-800">Recibo de Venta</h1>
-                    <p class="text-sm text-gray-500 mt-1" id="inv-date">Fecha</p>
-                    <p class="text-xs text-gray-400 font-mono mt-1" id="inv-id">#ID</p>
-                </div>
-
-                <!-- Info Cliente -->
-                <div class="bg-gray-50 p-4 rounded-lg mb-6 text-sm space-y-2 border print:border-none print:bg-transparent print:p-0">
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Cliente:</span>
-                        <span class="font-bold text-gray-800" id="inv-customer">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Teléfono:</span>
-                        <span class="font-bold text-gray-800" id="inv-phone">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-500">Método Pago:</span>
-                        <span class="font-bold text-gray-800" id="inv-payment">-</span>
-                    </div>
-                     <div class="flex justify-between">
-                        <span class="text-gray-500">Entrega:</span>
-                        <span class="font-bold text-gray-800" id="inv-delivery-type">-</span>
-                    </div>
-                    <div id="inv-address-box" class="hidden border-t pt-2 mt-2">
-                        <span class="block text-gray-500 text-xs mb-1">Dirección de Entrega:</span>
-                        <span class="block font-medium text-gray-800" id="inv-address"></span>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Costo de Envío</label>
+                        <input type="number" step="0.01" id="checkout-delivery" value="0.00" min="0" class="w-full border p-2 rounded-lg">
                     </div>
                 </div>
 
-                <!-- Tabla Items -->
-                <div class="mb-6">
-                    <div class="flex justify-between text-xs font-bold text-gray-400 uppercase border-b pb-2 mb-2">
-                        <span>Descripción</span>
-                        <span>Total</span>
-                    </div>
-                    <div id="inv-items" class="space-y-3 text-sm text-gray-700"></div>
+                <div class="flex justify-between font-semibold text-lg border-t pt-4">
+                    <span>Total a Pagar:</span>
+                    <span id="checkout-total-display" class="text-green-600">$0.00</span>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Monto Recibido ($)</label>
+                    <input type="number" step="0.01" id="checkout-paid" value="0.00" min="0" required class="w-full border p-2 text-2xl font-bold rounded-lg text-indigo-700">
                 </div>
 
-                <!-- Totales -->
-                <div class="space-y-2 text-right border-t pt-4">
-                    <div class="flex justify-between text-sm"><span>Subtotal</span> <span id="inv-subtotal" class="font-medium">C$0.00</span></div>
-                    <div class="flex justify-between text-sm text-red-500" id="row-inv-disc"><span>Descuento</span> <span id="inv-discount">-C$0.00</span></div>
-                    <div class="flex justify-between text-sm text-blue-600" id="row-inv-ship"><span>Envío</span> <span id="inv-shipping">+C$0.00</span></div>
-                    <div class="flex justify-between text-xl font-bold text-indigo-900 pt-2 border-t mt-2"><span>Total Final</span> <span id="inv-total">C$0.00</span></div>
+                <div class="flex justify-between font-bold text-xl text-red-600">
+                    <span>Cambio:</span>
+                    <span id="checkout-change-display">$0.00</span>
                 </div>
-
-                <div class="mt-12 text-center print:mt-8">
-                    <p class="font-bold text-gray-800">¡Gracias por su preferencia!</p>
-                    <p class="text-xs text-gray-400 mt-1">Si tiene dudas contacte a soporte.</p>
+                
+                <div class="flex gap-2 mt-6">
+                    <button type="button" onclick="toggleModal('modal-checkout')" class="flex-1 bg-gray-200 py-3 rounded-lg font-semibold hover:bg-gray-300">Cancelar</button>
+                    <button type="submit" id="confirm-checkout-btn" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition duration-150">
+                        <i data-lucide="check" class="w-5 h-5 inline mr-1"></i> Confirmar Cobro
+                    </button>
                 </div>
-            </div>
-
-            <!-- Botones de Acción (Whatsapp / Print) -->
-            <div class="no-print p-4 bg-gray-50 border-t sticky bottom-0 grid grid-cols-2 gap-3">
-                <button onclick="window.print()" class="flex items-center justify-center gap-2 bg-gray-200 text-gray-800 py-3 rounded-xl font-bold hover:bg-gray-300 transition">
-                    <i data-lucide="printer" class="w-5 h-5"></i> Imprimir
-                </button>
-                <button onclick="sendToWhatsApp()" class="flex items-center justify-center gap-2 bg-green-500 text-white py-3 rounded-xl font-bold hover:bg-green-600 transition shadow-lg shadow-green-200">
-                    <i data-lucide="message-circle" class="w-5 h-5"></i> Enviar a WhatsApp
-                </button>
-                <button onclick="copyLink()" class="col-span-2 flex items-center justify-center gap-2 border border-indigo-200 text-indigo-600 py-3 rounded-xl font-medium hover:bg-indigo-50 transition">
-                    <i data-lucide="link" class="w-5 h-5"></i> Copiar Enlace Factura
-                </button>
-            </div>
+            </form>
         </div>
     </div>
 
-    <!-- LOGIC -->
+    <!-- 5. VISTA DE FACTURA (Oculta por defecto) -->
+    <div id="invoice-view" class="fixed inset-0 bg-gray-100 flex items-center justify-center z-50 hidden overflow-y-auto p-4">
+        <div id="printable-area" class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-auto my-8 p-8">
+            <div class="text-center mb-6">
+                <h3 class="text-3xl font-extrabold text-indigo-700">Factura de Venta</h3>
+                <p class="text-sm text-gray-500 mt-1">ID Orden: <span id="inv-order-id" class="font-mono"></span></p>
+                <p class="text-xs text-gray-500 mt-1">Fecha: <span id="inv-date"></span></p>
+            </div>
+
+            <h4 class="text-lg font-semibold border-b pb-2 mb-2">Productos Vendidos</h4>
+            <table class="w-full text-sm mb-4">
+                <thead>
+                    <tr class="font-bold text-left">
+                        <th class="py-1">Producto</th>
+                        <th class="py-1 text-right">Cant.</th>
+                        <th class="py-1 text-right">Precio</th>
+                        <th class="py-1 text-right">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="inv-items-body">
+                    <!-- Items de factura inyectados aquí -->
+                </tbody>
+            </table>
+
+            <div class="space-y-1 text-right border-t pt-2">
+                <div class="flex justify-between" id="inv-row-subtotal">
+                    <span class="font-medium">Subtotal:</span>
+                    <span id="inv-subtotal" class="font-medium">$0.00</span>
+                </div>
+                <div class="flex justify-between" id="inv-row-tax">
+                    <span class="font-medium">Impuestos (15%):</span>
+                    <span id="inv-tax">$0.00</span>
+                </div>
+                <div class="flex justify-between hidden" id="inv-row-disc">
+                    <span class="font-medium text-red-600">Descuento:</span>
+                    <span id="inv-disc" class="font-medium text-red-600">-$0.00</span>
+                </div>
+                 <div class="flex justify-between hidden" id="inv-row-del">
+                    <span class="font-medium text-indigo-600">Costo Envío:</span>
+                    <span id="inv-del" class="font-medium text-indigo-600">+$0.00</span>
+                </div>
+                <div class="flex justify-between border-t mt-2 pt-2 text-xl font-bold text-green-700">
+                    <span>TOTAL:</span>
+                    <span id="inv-total">$0.00</span>
+                </div>
+            </div>
+            
+            <p class="text-center text-xs text-gray-400 mt-6">¡Gracias por su compra!</p>
+            <p class="text-center text-xs text-gray-400">Atendido por: <span id="inv-user"></span></p>
+        </div>
+
+        <div class="fixed bottom-4 right-4 print:hidden flex space-x-3">
+            <button onclick="window.print()" class="bg-indigo-600 text-white p-3 rounded-full shadow-lg hover:bg-indigo-700 transition duration-150 flex items-center space-x-2">
+                <i data-lucide="printer" class="w-6 h-6"></i>
+            </button>
+            <button onclick="copyInvoiceLink()" class="bg-green-500 text-white p-3 rounded-full shadow-lg hover:bg-green-600 transition duration-150 flex items-center space-x-2">
+                <i data-lucide="share-2" class="w-6 h-6"></i>
+            </button>
+            <button onclick="closeInvoice()" class="bg-gray-700 text-white p-3 rounded-full shadow-lg hover:bg-gray-800 transition duration-150 flex items-center space-x-2">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- 6. Scripts Unificados -->
     <script type="module">
+        // --- 6.1. FIREBASE SETUP (UNIFICADO) ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getDatabase, ref, onValue, push, set, get, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
-        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getDatabase, ref, onValue, push, set, update, remove, get, child, runTransaction, query as dbQuery, limitToLast } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            onAuthStateChanged,
+            signOut,
+            signInWithCustomToken,
+            signInAnonymously
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
-        // NOTA: Reemplazar con las credenciales de Firebase de tu entorno si es necesario
-        const firebaseConfig = {
-            apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
-            authDomain: "posdeventas-a03ca.firebaseapp.com",
-            databaseURL: "https://posdeventas-a03ca-default-rtdb.firebaseio.com",
-            projectId: "posdeventas-a03ca",
-            storageBucket: "posdeventas-a03ca.firebasestorage.app",
-            messagingSenderId: "975141670948",
-            appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
-        };
+        // CONFIGURACIÓN DE FIREBASE Y VARIABLES GLOBALES
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-pos-app';
+        let auth;
+        let db;
+        let userId = null;
+        let userEmail = 'Anónimo'; // Variable para mostrar en la factura
+        let appInitialized = false;
 
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
+        if (Object.keys(firebaseConfig).length > 0) {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            auth = getAuth(app);
+            // Esto es crucial para la seguridad
+            window.setLogLevel('debug'); 
+        } else {
+            console.error("ERROR: Firebase configuration is missing.");
+        }
 
-        let currentUser = null;
+        // --- 6.2. ESTADO GLOBAL y DOM ---
         let products = [];
         let cart = [];
+        let orders = [];
         let currentOrder = null;
-        const CURRENCY = "C$"; // Símbolo de moneda
+        const IVA_RATE = 0.15; // 15% de IVA
 
-        // ELEMENTOS DOM
+        const grid = document.getElementById('product-grid');
+        const cartContainer = document.getElementById('cart-items');
+        const cartSubtotalEl = document.getElementById('cart-subtotal');
+        const cartTaxEl = document.getElementById('cart-tax');
+        const cartTotalEl = document.getElementById('cart-total');
+        const cartCountEl = document.getElementById('cart-count');
+        const checkoutBtn = document.getElementById('checkout-btn');
+        const productForm = document.getElementById('product-form');
+        const invTableBody = document.getElementById('inventory-table-body');
+        const ordersTableBody = document.getElementById('orders-table-body');
         const authScreen = document.getElementById('auth-screen');
         const appScreen = document.getElementById('app-screen');
-        const views = {
-            pos: document.getElementById('view-pos'),
-            cart: document.getElementById('view-cart'),
-            inventory: document.getElementById('view-inventory'),
-            orders: document.getElementById('view-orders')
-        };
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const logoutBtn = document.getElementById('logout-btn');
+        const checkoutForm = document.getElementById('checkout-form');
+        const checkoutTotalDisplay = document.getElementById('checkout-total-display');
+        const checkoutPaidInput = document.getElementById('checkout-paid');
+        const checkoutChangeDisplay = document.getElementById('checkout-change-display');
+        const searchInput = document.getElementById('search-input');
+        const categoryFilter = document.getElementById('category-filter');
+        
+        // --- 6.3. UTILIDADES ---
+        // Utilidad para crear mensajes Toast (sustituye a alert())
+        window.alertMessage = (message, type = 'info', duration = 3000) => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const baseClasses = "flex items-center w-full max-w-xs p-4 mb-4 rounded-lg shadow-md transition-opacity duration-300";
+            let typeClasses = "";
 
-        window.addEventListener('load', () => {
-            lucide.createIcons();
-            // Revisar si es enlace público de factura
-            const urlParams = new URLSearchParams(window.location.search);
-            const orderId = urlParams.get('orderId');
-            if(orderId) {
-                // Modo Público: Mostrar solo factura
-                authScreen.classList.add('hidden');
-                appScreen.classList.add('hidden');
-                fetchAndShowInvoice(orderId);
-            } else {
-                // Modo Admin: Chequear Auth
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        currentUser = user;
-                        authScreen.classList.add('hidden');
-                        appScreen.classList.remove('hidden');
-                        appScreen.classList.add('flex');
-                        document.getElementById('user-email-display').innerText = user.email;
-                        initListeners();
-                        navTo('pos'); // Asegurar vista inicial
-                    } else {
-                        authScreen.classList.remove('hidden');
-                        appScreen.classList.add('hidden');
-                        appScreen.classList.remove('flex');
-                    }
-                });
+            switch (type) {
+                case 'success':
+                    typeClasses = "bg-green-100 text-green-700 border-green-400 border";
+                    break;
+                case 'error':
+                    typeClasses = "bg-red-100 text-red-700 border-red-400 border";
+                    break;
+                case 'info':
+                default:
+                    typeClasses = "bg-blue-100 text-blue-700 border-blue-400 border";
+                    break;
             }
-        });
 
-        // --- NAVEGACIÓN ---
-        window.navTo = (viewName) => {
-            Object.values(views).forEach(el => el.classList.add('hidden'));
-            views[viewName].classList.remove('hidden');
-            updateNavStyles(viewName);
+            toast.className = `${baseClasses} ${typeClasses} opacity-0`;
+            toast.innerHTML = `
+                <div class="text-sm font-semibold flex-1">${message}</div>
+                <button type="button" class="ml-auto text-gray-500 hover:text-gray-700" onclick="this.closest('div').remove()">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            `;
+            container.appendChild(toast);
+            
+            // Animación de entrada
+            setTimeout(() => toast.classList.remove('opacity-0'), 10);
+
+            // Auto-cierre
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+            
+            // Re-renderizar iconos de Lucide
+            if(window.lucide) window.lucide.createIcons();
+        };
+        window.nonBlockingAlert = window.alertMessage; // Alias
+
+        // Funciones UI Globales (accesibles desde HTML)
+        window.toggleModal = (id) => {
+            const el = document.getElementById(id);
+            if(el) el.classList.toggle('hidden');
+            // Asegurar que el focus esté en el primer input al abrir el modal de producto
+            if (id === 'modal-product' && !el.classList.contains('hidden')) {
+                document.querySelector('#product-form [name="name"]').focus();
+            }
         };
 
-        function updateNavStyles(active) {
-            ['pos', 'cart', 'inventory', 'orders'].forEach(v => {
-                document.getElementById(`m-nav-${v}`)?.classList.replace('text-indigo-600', 'text-gray-400');
-                document.getElementById(`d-nav-${v}`)?.classList.remove('bg-indigo-50', 'text-indigo-600');
+        window.toggleTab = (tabId) => {
+            const views = ['products-view', 'inventory-view', 'orders-view'];
+            views.forEach(id => {
+                document.getElementById(id).classList.add('hidden');
             });
-            document.getElementById(`m-nav-${active}`)?.classList.replace('text-gray-400', 'text-indigo-600');
-            document.getElementById(`d-nav-${active}`)?.classList.add('bg-indigo-50', 'text-indigo-600');
-        }
+            document.getElementById(tabId).classList.remove('hidden');
+        };
 
-        // --- DATOS ---
-        function initListeners() {
-            onValue(ref(db, 'products'), (snapshot) => {
+        // --- 6.4. MANEJO DE AUTENTICACIÓN Y LISTENERS (CORRECCIÓN CRÍTICA) ---
+        
+        // Función para inicializar los listeners de la base de datos (se llama SOLO después de login)
+        function startDataListeners(uid) {
+            if (!db) return; // Si la base de datos no está inicializada, salir
+
+            // Rutas de datos (colecciones privadas por usuario, como lo exigen las reglas)
+            const productsRef = ref(db, `artifacts/${appId}/users/${uid}/products`);
+            const ordersRef = ref(db, `artifacts/${appId}/users/${uid}/orders`);
+            
+            // 1. Escuchar Productos en Tiempo Real
+            onValue(productsRef, (snapshot) => {
                 const data = snapshot.val();
                 products = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
-                renderPOS();
-                renderInventory();
+                renderProductGrid();
+                renderInventoryTable();
+                updateCategoryFilter();
+            }, (error) => {
+                window.alertMessage("Error al cargar productos: " + error.message, 'error');
+                console.error("Firebase Read Error (Products):", error);
             });
-            onValue(ref(db, 'orders'), (snapshot) => {
+
+            // 2. Escuchar Órdenes en Tiempo Real (usando limitToLast para eficiencia)
+            // Se usa dbQuery para poder usar la función limitToLast
+            const recentOrdersQuery = dbQuery(ordersRef, limitToLast(50));
+            onValue(recentOrdersQuery, (snapshot) => {
                 const data = snapshot.val();
-                const orders = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse() : [];
-                renderOrders(orders);
+                orders = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse() : [];
+                renderOrdersTable();
+            }, (error) => {
+                window.alertMessage("Error al cargar órdenes: " + error.message, 'error');
+                console.error("Firebase Read Error (Orders):", error);
             });
         }
 
-        // --- RENDER POS ---
-        function renderPOS() {
-            const search = document.getElementById('search-pos').value.toLowerCase();
-            const filtered = products.filter(p => 
-                p.name.toLowerCase().includes(search) || 
-                (p.brand && p.brand.toLowerCase().includes(search)) ||
-                (p.sku && p.sku.toLowerCase().includes(search)) // Búsqueda por SKU
-            );
-            document.getElementById('pos-grid').innerHTML = filtered.map(p => `
-                <div onclick="addToCart('${p.id}')" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden active:scale-95 transition flex flex-col h-full relative cursor-pointer group">
-                    <div class="h-32 bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                        ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">` : `<i data-lucide="image" class="text-gray-300 w-8 h-8"></i>`}
-                        ${p.stock <= 0 ? '<div class="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-bold uppercase backdrop-blur-sm">Agotado</div>' : ''}
-                    </div>
-                    <div class="p-3 flex flex-col flex-1">
-                        <div class="text-[10px] text-gray-400 font-bold uppercase mb-0.5 flex justify-between">
-                            <span>${p.brand || 'Genérico'}</span>
-                            ${p.sku ? `<span class="font-mono">${p.sku}</span>` : ''}
-                        </div>
-                        <h3 class="text-xs font-bold text-gray-800 leading-tight mb-1 line-clamp-2">${p.name}</h3>
-                        <div class="mt-auto flex justify-between items-center">
-                            <span class="text-indigo-600 font-bold">${CURRENCY}${parseFloat(p.price).toFixed(2)}</span>
-                            <div class="w-6 h-6 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center"><i data-lucide="plus" class="w-3 h-3"></i></div>
-                        </div>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
-        document.getElementById('search-pos').addEventListener('input', renderPOS);
-
-        // --- CARRITO ---
-        window.addToCart = (id) => {
-            const p = products.find(x => x.id === id);
-            if(!p || p.stock <= 0) return alert("Sin stock");
-            const exist = cart.find(c => c.id === id);
-            if(exist && exist.qty >= p.stock) return alert("Stock máximo");
-            exist ? exist.qty++ : cart.push({...p, qty: 1});
-            renderCart();
-            animateCartIcon();
-        };
-
-        window.removeFromCart = (idx) => { cart.splice(idx, 1); renderCart(); };
-        window.clearCart = () => { cart = []; renderCart(); };
-
-        function renderCart() {
-            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+        // 3. Inicialización y manejo de estado de Auth
+        async function initializeAuth() {
+            if (!auth || appInitialized) return;
             
-            // Render HTML
-            const html = cart.length ? cart.map((item, i) => `
-                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
-                    <div class="flex items-center gap-3">
-                         <div class="w-8 h-8 bg-white rounded border flex items-center justify-center text-xs font-bold text-gray-500">${item.qty}x</div>
-                         <div><p class="font-bold text-sm text-gray-800 line-clamp-1 w-32">${item.name}</p><p class="text-xs text-indigo-600">${CURRENCY}${(item.price*item.qty).toFixed(2)}</p></div>
-                    </div>
-                    <button onclick="removeFromCart(${i})" class="text-red-400 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                </div>
-            `).join('') : '<div class="text-center py-10 text-gray-400"><i data-lucide="shopping-cart" class="w-10 h-10 mx-auto mb-2 opacity-30"></i><p>Carrito vacío</p></div>';
-
-            document.getElementById('cart-items-mobile').innerHTML = html;
-            document.getElementById('cart-items-desktop').innerHTML = html;
-
-            // Actualizar Badges y Totales UI
-            const badge = document.getElementById('badge-nav');
-            if(cart.length) { badge.classList.remove('hidden'); badge.innerText = cart.length; } else { badge.classList.add('hidden'); }
-            
-            document.getElementById('m-subtotal').innerText = `${CURRENCY}${subtotal.toFixed(2)}`;
-            const disc = parseFloat(document.getElementById('m-discount').value) || 0;
-            document.getElementById('m-total').innerText = `${CURRENCY}${Math.max(0, subtotal - disc).toFixed(2)}`;
-
-            document.getElementById('cart-summary-desktop').innerHTML = `
-                <div class="flex justify-between text-sm"><span>Subtotal:</span> <span>${CURRENCY}${subtotal.toFixed(2)}</span></div>
-                <div class="flex justify-between items-center text-sm my-2"><span>Descuento:</span> <input type="number" id="d-discount" class="w-20 border rounded text-right p-1" placeholder="0" oninput="renderCart()"></div>
-                <div class="flex justify-between font-bold text-xl pt-2 border-t text-indigo-900"><span>Total:</span> <span>${CURRENCY}${Math.max(0, subtotal - (parseFloat(document.getElementById('d-discount')?.value)||0)).toFixed(2)}</span></div>
-            `;
-            lucide.createIcons();
-        }
-
-        document.getElementById('m-discount').addEventListener('input', renderCart);
-
-        function animateCartIcon() {
-            const btn = document.getElementById('m-nav-cart');
-            btn.classList.add('scale-110', 'text-indigo-600');
-            setTimeout(() => btn.classList.remove('scale-110', 'text-indigo-600'), 200);
-        }
-
-        // --- PROCESO DE VENTA (CHECKOUT) ---
-        window.openCheckoutModal = () => {
-            if(cart.length === 0) return alert("Carrito vacío");
-            
-            // Sincronizar totales antes de abrir
-            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
-            const discInput = document.querySelector('#view-cart:not(.hidden) #m-discount') || document.getElementById('d-discount');
-            const discount = parseFloat(discInput?.value) || 0;
-            
-            // Reset fields
-            document.getElementById('checkout-name').value = '';
-            document.getElementById('checkout-phone').value = '';
-            document.getElementById('checkout-address').value = '';
-            document.getElementById('checkout-shipping').value = 0;
-            
-            // Calcular total inicial
-            window.currentCheckoutSubtotal = subtotal;
-            window.currentCheckoutDiscount = discount;
-            updateCheckoutTotal();
-
-            document.getElementById('modal-checkout').classList.remove('hidden');
-        };
-
-        window.toggleDeliveryFields = () => {
-            const type = document.querySelector('input[name="deliveryType"]:checked').value;
-            const details = document.getElementById('delivery-details');
-            if(type === 'delivery') {
-                details.classList.remove('hidden');
-            } else {
-                details.classList.add('hidden');
-                document.getElementById('checkout-shipping').value = 0;
-            }
-            updateCheckoutTotal();
-        };
-
-        window.updateCheckoutTotal = () => {
-            const shipping = parseFloat(document.getElementById('checkout-shipping').value) || 0;
-            const total = Math.max(0, window.currentCheckoutSubtotal - window.currentCheckoutDiscount + shipping);
-            document.getElementById('checkout-total-display').innerText = `${CURRENCY}${total.toFixed(2)}`;
-        };
-
-        window.confirmTransaction = async () => {
-            const name = document.getElementById('checkout-name').value.trim();
-            const phone = document.getElementById('checkout-phone').value.trim();
-            const type = document.querySelector('input[name="deliveryType"]:checked').value;
-            const address = document.getElementById('checkout-address').value.trim();
-            const payment = document.getElementById('checkout-payment').value;
-            const shipping = parseFloat(document.getElementById('checkout-shipping').value) || 0;
-
-            if(!name || !phone) return alert("Nombre y Teléfono son obligatorios");
-            if(type === 'delivery' && !address) return alert("Dirección requerida para delivery");
-
-            const total = Math.max(0, window.currentCheckoutSubtotal - window.currentCheckoutDiscount + shipping);
-
-            const order = {
-                date: new Date().toISOString(),
-                items: cart,
-                subtotal: window.currentCheckoutSubtotal,
-                discount: window.currentCheckoutDiscount,
-                shipping: shipping,
-                total: total,
-                customer: name,
-                phone: phone, 
-                deliveryType: type,
-                address: address,
-                paymentMethod: payment,
-                seller: currentUser.email
-            };
+            const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
             try {
-                // Stock Updates
-                const updates = cart.map(item => runTransaction(ref(db, `products/${item.id}/stock`), (curr) => (curr || 0) - item.qty));
-                await Promise.all(updates);
-                
-                // Save Order
-                const newRef = await push(ref(db, 'orders'), order);
-                
-                // Success
-                cart = [];
-                renderCart();
-                document.getElementById('modal-checkout').classList.add('hidden');
-                document.getElementById('m-discount').value = '';
-                if(document.getElementById('d-discount')) document.getElementById('d-discount').value = '';
-                navTo('pos');
-                
-                // Mostrar Factura con Botones
-                showInvoiceModal({id: newRef.key, ...order});
-
-            } catch(e) {
-                alert("Error: " + e.message);
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                    console.log("Inicio de sesión con token personalizado exitoso.");
+                } else {
+                    await signInAnonymously(auth);
+                    console.log("Inicio de sesión anónimo exitoso.");
+                }
+            } catch (error) {
+                console.error("Error en la autenticación inicial. Se necesita login manual.", error.message);
             }
-        };
-
-        // --- FACTURA Y WHATSAPP ---
-        function fetchAndShowInvoice(id) {
-            get(ref(db, `orders/${id}`)).then(snap => {
-                if(snap.exists()) showInvoiceModal({id: snap.key, ...snap.val()});
-                else alert("Factura no encontrada");
-            });
         }
 
-        window.showInvoiceModal = (order) => {
-            currentOrder = order;
-            document.getElementById('inv-id').innerText = `#${order.id.slice(-6).toUpperCase()}`;
-            document.getElementById('inv-date').innerText = new Date(order.date).toLocaleString();
-            document.getElementById('inv-customer').innerText = order.customer;
-            document.getElementById('inv-phone').innerText = order.phone || 'N/A';
-            document.getElementById('inv-payment').innerText = order.paymentMethod;
-            document.getElementById('inv-delivery-type').innerText = order.deliveryType === 'delivery' ? 'Envío a Domicilio' : 'Retiro en Tienda';
-            
-            // Dirección
-            const addrBox = document.getElementById('inv-address-box');
-            if(order.deliveryType === 'delivery' && order.address) {
-                addrBox.classList.remove('hidden');
-                document.getElementById('inv-address').innerText = order.address;
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Usuario logueado: INICIAR APP
+                userId = user.uid;
+                userEmail = user.email || 'Usuario Anónimo';
+                document.getElementById('user-info').innerText = userEmail;
+
+                authScreen.classList.add('hidden');
+                
+                // CRÍTICO: Iniciar listeners de datos solo cuando el usuario está autenticado
+                if (!appInitialized) {
+                    startDataListeners(userId);
+                    appInitialized = true;
+                }
+
+                // Revisar si estamos viendo una factura pública por URL
+                const urlParams = new URLSearchParams(window.location.search);
+                if(!urlParams.get('orderId')) {
+                    appScreen.classList.remove('hidden');
+                } else {
+                     // Si hay orderId, ocultar la app principal y esperar a que se cargue la factura
+                }
+
             } else {
-                addrBox.classList.add('hidden');
+                // Usuario no logueado: Mostrar LOGIN
+                authScreen.classList.remove('hidden');
+                appScreen.classList.add('hidden');
+                
+                // Si estamos en modo factura, esto no debería ocurrir, pero lo forzamos a cargar la app si es necesario
             }
+            // Después de resolver la autenticación, verificar URL para facturas
+            checkUrlForInvoice(); 
+        });
 
-            // Items
-            document.getElementById('inv-items').innerHTML = order.items.map(i => `
-                <div class="flex justify-between border-b border-gray-100 last:border-0 py-2">
-                    <div class="flex gap-2">
-                        <span class="font-bold text-gray-500">${i.qty}x</span>
-                        <span>${i.name} ${i.sku ? `(<span class="font-mono text-xs text-gray-400">${i.sku}</span>)` : ''}</span>
-                    </div>
-                    <span class="font-medium">${CURRENCY}${(i.price * i.qty).toFixed(2)}</span>
-                </div>
-            `).join('');
-
-            // Totales
-            document.getElementById('inv-subtotal').innerText = `${CURRENCY}${order.subtotal.toFixed(2)}`;
-            
-            const discRow = document.getElementById('row-inv-disc');
-            if(order.discount > 0) {
-                discRow.classList.remove('hidden');
-                document.getElementById('inv-discount').innerText = `-${CURRENCY}${order.discount.toFixed(2)}`;
-            } else { discRow.classList.add('hidden'); }
-
-            const shipRow = document.getElementById('row-inv-ship');
-            if(order.shipping > 0) {
-                shipRow.classList.remove('hidden');
-                document.getElementById('inv-shipping').innerText = `+${CURRENCY}${order.shipping.toFixed(2)}`;
-            } else { shipRow.classList.add('hidden'); }
-
-            document.getElementById('inv-total').innerText = `${CURRENCY}${order.total.toFixed(2)}`;
-            
-            document.getElementById('invoice-view').classList.remove('hidden');
-        };
-
-        window.closeInvoice = () => {
-            document.getElementById('invoice-view').classList.add('hidden');
-            if(new URLSearchParams(window.location.search).get('orderId')) {
-                window.location.href = window.location.pathname; // Limpiar URL
-            }
-        };
-
-        window.sendToWhatsApp = () => {
-            if(!currentOrder) return;
-            
-            // Construir enlace de la factura
-            const invoiceUrl = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
-            
-            // Construir Mensaje
-            let msg = `*HOLA ${currentOrder.customer.toUpperCase()}!*\n`;
-            msg += `Gracias por tu compra en Mi Tienda.\n\n`;
-            msg += `🧾 *Orden:* #${currentOrder.id.slice(-6).toUpperCase()}\n`;
-            msg += `📅 *Fecha:* ${new Date(currentOrder.date).toLocaleDateString()}\n`;
-            msg += `💰 *TOTAL A PAGAR: ${CURRENCY}${currentOrder.total.toFixed(2)}*\n\n`;
-            
-            if(currentOrder.deliveryType === 'delivery') {
-                msg += `🛵 *Entrega:* Delivery\n`;
-                msg += `📍 *Dirección:* ${currentOrder.address}\n`;
-            } else {
-                msg += `🏪 *Entrega:* Retiro en Tienda\n`;
-            }
-            
-            msg += `\n📎 *Ver Factura Digital:*\n${invoiceUrl}`;
-
-            // Número limpio (quitando espacios o guiones si los hubiera puesto el usuario)
-            let phone = currentOrder.phone.replace(/\D/g,''); 
-            // Asegurar código de país si falta (asumiendo 505 por defecto si no tiene 8+ digitos)
-            if(phone.length === 8) phone = '505' + phone;
-
-            const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-            window.open(waUrl, '_blank');
-        };
-
-        window.copyLink = () => {
-            if(!currentOrder) return;
-            const url = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
-            navigator.clipboard.writeText(url).then(() => alert("Enlace copiado al portapapeles"));
-        };
-
-        // --- GESTIÓN INVENTARIO ---
-        const modalProd = document.getElementById('modal-product');
-        const formProd = document.getElementById('product-form');
-
-        window.openProductModal = () => { formProd.reset(); document.getElementById('prod-id').value=''; modalProd.classList.remove('hidden'); };
-        window.closeProductModal = () => modalProd.classList.add('hidden');
-        
-        window.editProduct = (id) => {
-            const p = products.find(x => x.id===id);
-            if(!p) return;
-            Object.keys(p).forEach(k => { if(formProd.elements[k]) formProd.elements[k].value = p[k]; });
-            document.getElementById('prod-id').value = id;
-            modalProd.classList.remove('hidden');
-        };
-
-        window.submitProduct = async () => {
-            const fd = new FormData(formProd);
-            const data = Object.fromEntries(fd.entries());
-            // Conversión a números
-            data.price=parseFloat(data.price); 
-            data.cost=parseFloat(data.cost); 
-            data.stock=parseInt(data.stock);
-            // Asegurar que SKU sea string (obligatorio)
-            data.sku = data.sku.trim().toUpperCase(); 
-
-            if(!data.sku) return alert("El SKU/Código es obligatorio.");
-
-            const id = data.id; delete data.id;
-            try {
-                id ? await set(ref(db, `products/${id}`), data) : await push(ref(db, 'products'), data);
-                closeProductModal();
-                alert("Guardado");
-            } catch(e) { alert("Error: "+e.message); }
-        };
-
-        function renderInventory() {
-            document.getElementById('inventory-list').innerHTML = products.map(p => `
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden shrink-0">${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover">` : `<span class="flex items-center justify-center h-full text-xs font-bold text-gray-400">IMG</span>`}</div>
-                        <div>
-                            <h3 class="font-bold text-sm text-gray-800">${p.name}</h3>
-                            <p class="text-xs text-gray-500">${p.brand||''} • ${p.category||''}</p>
-                            <div class="text-xs mt-1">
-                                ${p.sku ? `<span class="font-mono text-indigo-500 font-bold">${p.sku}</span> | ` : ''}
-                                <span class="text-gray-400">Costo: ${CURRENCY}${p.cost}</span> 
-                                <span class="ml-2 font-bold text-green-600">Venta: ${CURRENCY}${p.price}</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex flex-col items-end gap-2">
-                        <div class="text-sm font-bold ${p.stock<5?'text-red-500':'text-gray-700'}">Stock: ${p.stock}</div>
-                        <button onclick="editProduct('${p.id}')" class="text-indigo-600 text-xs font-bold bg-indigo-50 px-2 py-1 rounded">Editar</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // --- AUTH ---
-        let isLogin=true;
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
+        // 4. Handlers de formularios de Auth
+        loginForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-pass').value;
-            const btn = document.getElementById('btn-login');
-            btn.innerHTML = '<div class="loader mx-auto border-white border-t-transparent"></div>';
-            try {
-                isLogin ? await signInWithEmailAndPassword(auth, email, pass) : await createUserWithEmailAndPassword(auth, email, pass);
-            } catch(e) { alert("Error: "+e.message); btn.innerText = isLogin?"Ingresar":"Registrar"; }
+            
+            signInWithEmailAndPassword(auth, email, pass)
+                .catch((error) => window.alertMessage("Error de inicio de sesión: " + error.message, 'error'));
         });
-        document.getElementById('toggle-auth').addEventListener('click', (e) => {
-            isLogin = !isLogin;
-            e.target.innerText = isLogin ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Ingresa";
-            document.getElementById('btn-login').innerText = isLogin ? "Ingresar" : "Registrar";
+
+        registerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = document.getElementById('reg-email').value;
+            const pass = document.getElementById('reg-pass').value;
+
+            createUserWithEmailAndPassword(auth, email, pass)
+                .then(() => {
+                    window.alertMessage("Usuario creado. Ingresando...", 'success');
+                    registerForm.reset();
+                })
+                .catch((error) => window.alertMessage("Error de registro: " + error.message, 'error'));
         });
-        document.getElementById('btn-logout').addEventListener('click', () => confirm("¿Salir?") && signOut(auth));
+
+        logoutBtn.addEventListener('click', () => {
+             // Reemplazo simple de confirm() con una alerta informativa
+            window.alertMessage("Cerrando sesión. Por favor, espere.", 'info');
+            signOut(auth).catch((error) => window.alertMessage("Error al cerrar sesión: " + error.message, 'error'));
+        });
+
+        // UI Alternar registro
+        document.getElementById('show-register-btn').addEventListener('click', () => {
+            document.getElementById('login-form').classList.add('hidden');
+            registerForm.classList.remove('hidden');
+        });
+        document.getElementById('cancel-reg-btn').addEventListener('click', () => {
+            registerForm.classList.add('hidden');
+            document.getElementById('login-form').classList.remove('hidden');
+        });
+
+        // Llamar a la función de inicialización de la autenticación
+        initializeAuth();
         
-        // Render Orders History
-        function renderOrders(list) {
-            document.getElementById('orders-list').innerHTML = list.map(o => `
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
-                    <div>
-                        <div class="text-[10px] text-gray-400 font-mono">#${o.id.slice(-6)}</div>
-                        <div class="font-bold text-sm">${o.customer}</div>
-                        <div class="text-xs text-gray-500">${new Date(o.date).toLocaleDateString()} • ${o.deliveryType === 'delivery' ? '🛵 Delivery' : '🏪 Tienda'}</div>
+        // --- 6.5. LÓGICA DEL TPV (PRODUCTOS Y CARRITO) ---
+
+        // Función para renderizar la cuadrícula de productos (vista de venta)
+        function renderProductGrid() {
+            let filteredProducts = products;
+            const searchTerm = searchInput.value.toLowerCase();
+            const selectedCategory = categoryFilter.value;
+
+            if (searchTerm) {
+                filteredProducts = filteredProducts.filter(p => 
+                    p.name.toLowerCase().includes(searchTerm) || 
+                    p.category.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (selectedCategory) {
+                filteredProducts = filteredProducts.filter(p => p.category === selectedCategory);
+            }
+
+            if (filteredProducts.length === 0) {
+                grid.innerHTML = `<p class="text-center text-gray-500 col-span-full">${products.length === 0 ? 'Aún no hay productos.' : 'No se encontraron productos.'}</p>`;
+                return;
+            }
+
+            grid.innerHTML = filteredProducts.map(p => `
+                <div onclick="addToCart('${p.id}')" 
+                     class="bg-white rounded-xl shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition duration-200 transform hover:-translate-y-0.5 relative group">
+                    
+                    ${p.stock <= 5 ? `<span class="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full z-10">Stock Bajo! (${p.stock})</span>` : ''}
+
+                    <div class="h-32 bg-gray-200 flex items-center justify-center p-2" 
+                         style="background-image: url('${p.imageUrl || 'https://placehold.co/150x150/E5E7EB/6B7280?text=SIN+IMG'}'); background-size: cover; background-position: center;">
                     </div>
-                    <div class="text-right">
-                        <div class="font-bold text-indigo-600">${CURRENCY}${parseFloat(o.total).toFixed(2)}</div>
-                        <button onclick='fetchAndShowInvoice("${o.id}")' class="text-xs text-gray-400 underline mt-1">Ver Ticket</button>
+                    
+                    <div class="p-3">
+                        <h3 class="font-semibold text-gray-800 truncate">${p.name}</h3>
+                        <p class="text-xl font-bold text-indigo-600 mt-1">$${p.price.toFixed(2)}</p>
                     </div>
                 </div>
             `).join('');
+            
+            // Re-renderizar iconos de Lucide (si se usaran en el grid)
+            if(window.lucide) window.lucide.createIcons();
         }
-        window.fetchAndShowInvoice = fetchAndShowInvoice; 
+        
+        // Función para actualizar el filtro de categorías
+        function updateCategoryFilter() {
+            const categories = [...new Set(products.map(p => p.category))].sort();
+            categoryFilter.innerHTML = '<option value="">Todas las categorías</option>';
+            categoryFilter.innerHTML += categories.map(c => 
+                `<option value="${c}">${c}</option>`
+            ).join('');
+        }
+
+        // Listeners para búsqueda y filtro
+        searchInput.addEventListener('input', renderProductGrid);
+        categoryFilter.addEventListener('change', renderProductGrid);
+
+        // Función para añadir producto al carrito
+        window.addToCart = (productId) => {
+            const product = products.find(p => p.id === productId);
+            if (!product) {
+                window.alertMessage("Error: Producto no encontrado.", 'error');
+                return;
+            }
+
+            const cartItem = cart.find(item => item.id === productId);
+
+            if (cartItem) {
+                if (cartItem.quantity < product.stock) {
+                    cartItem.quantity++;
+                } else {
+                    window.alertMessage("Stock insuficiente para añadir más.", 'error');
+                }
+            } else {
+                if (product.stock > 0) {
+                    cart.push({
+                        id: product.id,
+                        name: product.name,
+                        price: product.price,
+                        cost: product.cost,
+                        quantity: 1,
+                    });
+                } else {
+                    window.alertMessage("Producto agotado.", 'error');
+                }
+            }
+            renderCart();
+        };
+
+        // Función para actualizar la cantidad del producto en el carrito
+        window.updateCartQuantity = (productId, change) => {
+            const cartItem = cart.find(item => item.id === productId);
+            if (!cartItem) return;
+
+            const product = products.find(p => p.id === productId);
+
+            if (change === 'add') {
+                if (cartItem.quantity < product.stock) {
+                    cartItem.quantity++;
+                } else {
+                    window.alertMessage("Stock insuficiente.", 'error');
+                }
+            } else if (change === 'subtract') {
+                cartItem.quantity--;
+            }
+
+            if (cartItem.quantity <= 0) {
+                cart = cart.filter(item => item.id !== productId);
+            }
+            renderCart();
+        };
+
+        // Función para renderizar el carrito
+        function renderCart() {
+            if (cart.length === 0) {
+                cartContainer.innerHTML = '<p class="text-gray-500 text-sm text-center">Añada productos para comenzar una venta.</p>';
+                cartSubtotalEl.innerText = '$0.00';
+                cartTaxEl.innerText = '$0.00';
+                cartTotalEl.innerText = '$0.00';
+                cartCountEl.innerText = '0';
+                checkoutBtn.disabled = true; // Deshabilitar el botón de cobro
+                return;
+            }
+
+            checkoutBtn.disabled = false; // Habilitar el botón de cobro
+
+            let subtotal = 0;
+            let totalItems = 0;
+
+            cartContainer.innerHTML = cart.map(item => {
+                const itemTotal = item.price * item.quantity;
+                subtotal += itemTotal;
+                totalItems += item.quantity;
+
+                return `
+                    <div class="flex items-center justify-between p-2 bg-white rounded-lg shadow-sm">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-800 truncate">${item.name}</p>
+                            <p class="text-sm text-indigo-600 font-semibold">$${item.price.toFixed(2)} c/u</p>
+                        </div>
+                        <div class="flex items-center space-x-1 ml-2">
+                            <button onclick="updateCartQuantity('${item.id}', 'subtract')" class="p-1 text-gray-600 hover:bg-gray-100 rounded-full" title="Menos">
+                                <i data-lucide="minus" class="w-4 h-4"></i>
+                            </button>
+                            <span class="font-bold w-6 text-center">${item.quantity}</span>
+                            <button onclick="updateCartQuantity('${item.id}', 'add')" class="p-1 text-gray-600 hover:bg-gray-100 rounded-full" title="Más">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <span class="font-bold ml-4 w-16 text-right">$${itemTotal.toFixed(2)}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Recalcular Totales
+            const tax = subtotal * IVA_RATE;
+            const total = subtotal + tax;
+
+            cartSubtotalEl.innerText = `$${subtotal.toFixed(2)}`;
+            cartTaxEl.innerText = `$${tax.toFixed(2)}`;
+            cartTotalEl.innerText = `$${total.toFixed(2)}`;
+            cartCountEl.innerText = totalItems.toString();
+            
+            // Actualizar modal de checkout
+            document.getElementById('checkout-total-display').innerText = `$${total.toFixed(2)}`;
+            document.getElementById('checkout-paid').value = total.toFixed(2);
+            calculateChange();
+
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Función para vaciar el carrito
+        window.clearCart = () => {
+            if (cart.length > 0) {
+                 if (window.confirm("¿Estás seguro de que quieres vaciar el carrito?")) { // Usamos confirm para acción destructiva
+                    cart = [];
+                    renderCart();
+                    window.alertMessage("Carrito vaciado.", 'info');
+                 }
+            }
+        };
+
+        // --- 6.6. GESTIÓN DE PRODUCTOS (CRUD) ---
+
+        // Abrir modal de edición
+        window.editProduct = (productId) => {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            document.getElementById('product-modal-title').innerText = 'Editar Producto';
+            document.getElementById('product-id').value = product.id;
+            document.querySelector('#product-form [name="name"]').value = product.name;
+            document.querySelector('#product-form [name="price"]').value = product.price;
+            document.querySelector('#product-form [name="cost"]').value = product.cost;
+            document.querySelector('#product-form [name="stock"]').value = product.stock;
+            document.querySelector('#product-form [name="category"]').value = product.category;
+            document.querySelector('#product-form [name="imageUrl"]').value = product.imageUrl || '';
+            
+            document.getElementById('delete-product-btn').classList.remove('hidden');
+            document.getElementById('submit-product-btn').innerText = 'Actualizar';
+            window.toggleModal('modal-product');
+        };
+
+        // Resetear formulario (para añadir nuevo producto)
+        window.resetProductForm = () => {
+            document.getElementById('product-modal-title').innerText = 'Añadir Nuevo Producto';
+            productForm.reset();
+            document.getElementById('product-id').value = '';
+            document.getElementById('delete-product-btn').classList.add('hidden');
+            document.getElementById('submit-product-btn').innerText = 'Guardar Producto';
+        };
+
+        // Guardar/Actualizar producto
+        productForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!userId) {
+                window.alertMessage("Debe iniciar sesión para gestionar productos.", 'error');
+                return;
+            }
+            
+            const form = e.target;
+            const productId = document.getElementById('product-id').value;
+            
+            const data = {
+                name: form.elements['name'].value,
+                price: parseFloat(form.elements['price'].value),
+                cost: parseFloat(form.elements['cost'].value),
+                stock: parseInt(form.elements['stock'].value),
+                category: form.elements['category'].value,
+                imageUrl: form.elements['imageUrl'].value || null,
+            };
+
+            const productPath = `artifacts/${appId}/users/${userId}/products/${productId || push(ref(db)).key}`;
+            
+            set(ref(db, productPath), data)
+                .then(() => {
+                    window.alertMessage(productId ? "Producto actualizado con éxito." : "Producto añadido con éxito.", 'success');
+                    window.toggleModal('modal-product');
+                    resetProductForm();
+                })
+                .catch((error) => {
+                    window.alertMessage("Error al guardar producto: " + error.message, 'error');
+                    console.error("Error al guardar producto:", error);
+                });
+        });
+
+        // Eliminar producto
+        window.deleteProduct = () => {
+            const productId = document.getElementById('product-id').value;
+            if (!productId) return;
+            
+            if (window.confirm("¿Seguro que desea eliminar este producto?")) {
+                const productPath = `artifacts/${appId}/users/${userId}/products/${productId}`;
+                
+                remove(ref(db, productPath))
+                    .then(() => {
+                        window.alertMessage("Producto eliminado con éxito.", 'success');
+                        window.toggleModal('modal-product');
+                        resetProductForm();
+                    })
+                    .catch((error) => {
+                        window.alertMessage("Error al eliminar producto: " + error.message, 'error');
+                        console.error("Error al eliminar producto:", error);
+                    });
+            }
+        };
+
+        // Renderizar tabla de inventario (vista de gestión)
+        function renderInventoryTable() {
+            invTableBody.innerHTML = products.map(p => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${p.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-semibold">$${p.price.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${p.stock <= 5 ? 'text-red-600 font-bold' : 'text-gray-500'}">${p.stock}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${p.category}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="editProduct('${p.id}')" class="text-indigo-600 hover:text-indigo-900 transition duration-150" title="Editar">
+                            <i data-lucide="pencil" class="w-5 h-5 inline"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // --- 6.7. LÓGICA DE CHECKOUT Y TRANSACCIONES ---
+
+        // Función para calcular el cambio en el modal de checkout
+        function calculateChange() {
+            const totalText = cartTotalEl.innerText.replace('$', '');
+            const total = parseFloat(totalText) || 0;
+            const paid = parseFloat(checkoutPaidInput.value) || 0;
+            const change = paid - total;
+
+            checkoutTotalDisplay.innerText = `$${total.toFixed(2)}`;
+            checkoutChangeDisplay.innerText = `$${change.toFixed(2)}`;
+            checkoutChangeDisplay.classList.toggle('text-red-600', change < 0);
+            checkoutChangeDisplay.classList.toggle('text-green-600', change >= 0);
+            document.getElementById('confirm-checkout-btn').disabled = change < 0;
+        }
+
+        // Escuchar cambios en los inputs del modal de checkout
+        document.getElementById('checkout-discount-percent').addEventListener('input', updateCheckoutCalculations);
+        document.getElementById('checkout-delivery').addEventListener('input', updateCheckoutCalculations);
+        checkoutPaidInput.addEventListener('input', calculateChange);
+
+        function updateCheckoutCalculations() {
+            const subtotalText = cartSubtotalEl.innerText.replace('$', '');
+            let subtotal = parseFloat(subtotalText) || 0;
+            
+            const discountPercent = parseFloat(document.getElementById('checkout-discount-percent').value) || 0;
+            const delivery = parseFloat(document.getElementById('checkout-delivery').value) || 0;
+
+            const discountAmount = subtotal * (discountPercent / 100);
+            
+            // Subtotal después de descuento
+            const subtotalAfterDiscount = subtotal - discountAmount;
+            
+            // Impuestos (IVA 15% sobre el subtotal después de descuento)
+            const tax = subtotalAfterDiscount * IVA_RATE;
+            
+            // Total final
+            const total = subtotalAfterDiscount + tax + delivery;
+
+            // Actualizar Totales del Carrito (solo visual en el modal, no en la barra lateral)
+            checkoutTotalDisplay.innerText = `$${total.toFixed(2)}`;
+            checkoutPaidInput.value = total.toFixed(2); // Ajustar el monto pagado por defecto
+            
+            calculateChange();
+        }
+
+
+        // Finalizar Checkout (Transacción CRÍTICA)
+        checkoutForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userId || cart.length === 0) return;
+
+            const confirmBtn = document.getElementById('confirm-checkout-btn');
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 inline mr-1 animate-spin"></i> Procesando...';
+            if(window.lucide) window.lucide.createIcons();
+
+            // 1. Recalcular totales con descuentos/delivery
+            const subtotal = parseFloat(cartSubtotalEl.innerText.replace('$', ''));
+            const tax = parseFloat(cartTaxEl.innerText.replace('$', ''));
+            const discountPercent = parseFloat(document.getElementById('checkout-discount-percent').value) || 0;
+            const delivery = parseFloat(document.getElementById('checkout-delivery').value) || 0;
+            
+            const discountAmount = subtotal * (discountPercent / 100);
+            const total = subtotal + tax - discountAmount + delivery;
+            const paid = parseFloat(checkoutPaidInput.value) || 0;
+            const change = paid - total;
+
+            const orderId = push(ref(db, `artifacts/${appId}/users/${userId}/orders`)).key;
+            const updates = {};
+            let transactionError = false;
+
+            // 2. Ejecutar Transacciones de Stock para CADA artículo del carrito
+            for (const item of cart) {
+                const productRef = ref(db, `artifacts/${appId}/users/${userId}/products/${item.id}`);
+
+                await runTransaction(productRef, (currentProduct) => {
+                    if (currentProduct) {
+                        const newStock = currentProduct.stock - item.quantity;
+                        if (newStock < 0) {
+                            // Falla la transacción
+                            transactionError = `Stock insuficiente para ${item.name}. Disponible: ${currentProduct.stock}`;
+                            return; // Aborta la transacción
+                        }
+                        // Actualiza el stock
+                        currentProduct.stock = newStock;
+                        return currentProduct;
+                    } else {
+                        // Falla la transacción
+                        transactionError = `Producto ${item.name} no existe en inventario.`;
+                        return; // Aborta la transacción
+                    }
+                }, {
+                    maxRetries: 3
+                }).catch(error => {
+                    console.error("Error de Transacción (Stock):", error);
+                    transactionError = `Error de red al actualizar stock de ${item.name}. Intente de nuevo.`;
+                });
+
+                if (transactionError) break; // Si falla una transacción, salimos del loop
+            }
+
+            // 3. Si las transacciones de stock fueron exitosas, guardar la orden
+            if (!transactionError) {
+                const newOrder = {
+                    date: new Date().toISOString(),
+                    cart: cart.map(item => ({ 
+                        id: item.id, 
+                        name: item.name, 
+                        price: item.price, 
+                        quantity: item.quantity,
+                        cost: item.cost // Guardar el costo para reportes futuros
+                    })),
+                    subtotal: subtotal,
+                    tax: tax,
+                    discount: discountAmount,
+                    delivery: delivery,
+                    total: total,
+                    paid: paid,
+                    change: change,
+                    userId: userId,
+                    userName: userEmail,
+                };
+                
+                updates[`artifacts/${appId}/users/${userId}/orders/${orderId}`] = newOrder;
+
+                try {
+                    await update(ref(db), updates);
+                    window.alertMessage("¡Venta finalizada con éxito!", 'success');
+                    
+                    // Mostrar factura
+                    currentOrder = { id: orderId, ...newOrder };
+                    showInvoice(currentOrder);
+
+                    // Limpiar
+                    cart = [];
+                    renderCart();
+                    window.toggleModal('modal-checkout');
+                } catch (error) {
+                    window.alertMessage("Error al guardar la orden: " + error.message, 'error');
+                    console.error("Error al guardar la orden:", error);
+                }
+            } else {
+                // Si hubo error, notificar y mantener el carrito intacto
+                window.alertMessage(transactionError, 'error', 5000);
+            }
+
+            // Resetear el botón
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = '<i data-lucide="check" class="w-5 h-5 inline mr-1"></i> Confirmar Cobro';
+            if(window.lucide) window.lucide.createIcons();
+        });
+
+        // --- 6.8. GESTIÓN DE ÓRDENES Y FACTURAS ---
+
+        // Renderizar tabla de historial de órdenes
+        function renderOrdersTable() {
+            ordersTableBody.innerHTML = orders.map(o => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-mono">${o.id.substring(0, 8)}...</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${new Date(o.date).toLocaleDateString('es-ES')}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-700">$${o.total.toFixed(2)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${o.userName || o.userId.substring(0, 8)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button onclick="showOrderInvoice('${o.id}')" class="text-indigo-600 hover:text-indigo-900 transition duration-150" title="Ver Factura">
+                            <i data-lucide="receipt" class="w-5 h-5 inline"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Cargar datos de la factura (para historial o URL)
+        window.showOrderInvoice = (orderId) => {
+             const order = orders.find(o => o.id === orderId);
+             if (order) {
+                 currentOrder = order;
+                 showInvoice(order);
+             } else {
+                 // Si no está en el estado local, intentar cargar por ID (e.g. desde URL)
+                 loadInvoiceData(orderId);
+             }
+        };
+
+
+        async function loadInvoiceData(orderId) {
+            if (!db || !userId) {
+                // Esto ocurrirá si se accede por URL antes de que se complete la autenticación.
+                // El onAuthStateChanged se encargará de reintentar la llamada.
+                return; 
+            }
+            
+            const orderRef = ref(db, `artifacts/${appId}/users/${userId}/orders/${orderId}`);
+            try {
+                const snapshot = await get(orderRef);
+                if (snapshot.exists()) {
+                    const orderData = { id: orderId, ...snapshot.val() };
+                    currentOrder = orderData;
+                    showInvoice(orderData);
+                    document.getElementById('app-screen').classList.add('hidden'); // Asegura que solo se ve la factura
+                } else {
+                    window.alertMessage("Error: Factura no encontrada.", 'error');
+                }
+            } catch (error) {
+                window.alertMessage("Error al cargar la factura: " + error.message, 'error');
+                console.error("Error al cargar factura:", error);
+            }
+        }
+        
+        // Verifica si hay un orderId en la URL al cargar la página
+        function checkUrlForInvoice() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderId = urlParams.get('orderId');
+            
+            if (orderId && userId) { // Solo si hay ID y ya se tiene un userId
+                loadInvoiceData(orderId);
+            }
+        }
+
+
+        // Mostrar la factura en el modal/vista
+        function showInvoice(order) {
+            document.getElementById('inv-order-id').innerText = order.id;
+            document.getElementById('inv-date').innerText = new Date(order.date).toLocaleString('es-ES');
+            document.getElementById('inv-user').innerText = order.userName || 'Desconocido';
+            document.getElementById('inv-tax').innerText = `$${order.tax.toFixed(2)}`;
+
+            document.getElementById('inv-items-body').innerHTML = order.cart.map(item => `
+                <tr>
+                    <td class="py-1">${item.name}</td>
+                    <td class="py-1 text-right">${item.quantity}</td>
+                    <td class="py-1 text-right">$${item.price.toFixed(2)}</td>
+                    <td class="py-1 text-right">$${(item.price * item.quantity).toFixed(2)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('inv-subtotal').innerText = `$${order.subtotal.toFixed(2)}`;
+            document.getElementById('inv-total').innerText = `$${order.total.toFixed(2)}`;
+
+            // Manejar visualización de descuento/delivery si existen
+            const discRow = document.getElementById('inv-row-disc');
+            if(order.discount > 0) {
+                discRow.classList.remove('hidden');
+                document.getElementById('inv-disc').innerText = `-$${order.discount.toFixed(2)}`;
+            } else {
+                discRow.classList.add('hidden');
+            }
+
+            const delRow = document.getElementById('inv-row-del');
+            if(order.delivery > 0) {
+                delRow.classList.remove('hidden');
+                document.getElementById('inv-del').innerText = `+$${order.delivery.toFixed(2)}`;
+            } else {
+                delRow.classList.add('hidden');
+            }
+
+            document.getElementById('invoice-view').classList.remove('hidden');
+            if(window.lucide) window.lucide.createIcons();
+        }
+
+        // Cerrar la vista de factura
+        window.closeInvoice = () => {
+            document.getElementById('invoice-view').classList.add('hidden');
+            // Si vinimos por URL, redirigir al inicio limpio
+            const urlParams = new URLSearchParams(window.location.search);
+            if(urlParams.get('orderId')) {
+                window.location.href = window.location.pathname;
+            } else {
+                // Volver a mostrar la app principal si estaba oculta
+                document.getElementById('app-screen').classList.remove('hidden'); 
+            }
+        };
+
+        // Copiar enlace de factura (para compartir)
+        window.copyInvoiceLink = () => {
+            if(!currentOrder) return;
+            // IMPORTANTE: El link debe ser la URL actual con el orderId en los parámetros
+            const url = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
+            
+            // Usar execCommand('copy') como fallback para entornos sandboxed
+            const tempInput = document.createElement('input');
+            document.body.appendChild(tempInput);
+            tempInput.value = url;
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            
+            window.alertMessage("Enlace de factura copiado al portapapeles.", 'success');
+        };
+
+        // Inicialización final de iconos
+        window.addEventListener('load', () => {
+            if(window.lucide) window.lucide.createIcons();
+            // checkUrlForInvoice() se llama después de onAuthStateChanged
+        });
+        
     </script>
 </body>
 </html>
