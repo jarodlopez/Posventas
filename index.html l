@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Ventas - Facturación y Delivery</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- React CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel CDN (Necesario para interpretar JSX dentro del HTML) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons for React -->
+    <script src="https://unpkg.com/lucide-react@latest/dist/umd/lucide-react.min.js"></script>
+    <!-- jsPDF for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <!-- Firebase CDN -->
+    <!-- Se importan las funciones de Firebase. El código React las usará a través del objeto 'window.firebase' -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot, query, getDoc, serverTimestamp, orderBy, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Establecer el nivel de log para depuración de Firestore
+        // setLogLevel('debug'); // Descomenta esta línea para ver logs de Firebase en consola
+
+        // Exportar instancias de Firebase a la ventana global para que el script de Babel las use
+        window.firebase = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot, query, getDoc, serverTimestamp, orderBy
+        };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Clases para animación del Drawer */
+        .slide-in-from-right {
+            animation: slideIn 0.3s ease-out forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // Importar funciones de Firebase desde el objeto global que creamos
+        const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+                getFirestore, collection, addDoc, doc, deleteDoc, onSnapshot, query, getDoc, serverTimestamp, orderBy } = window.firebase;
+
+        // Importar React/ReactDOM
+        const { useState, useEffect, useMemo, useCallback } = React;
+        const ReactDOM = window.ReactDOM;
+
+        // Importar Lucide Icons desde el objeto global
+        const lucide = window.lucide;
+        const { Settings, Package, ShoppingCart, Plus, Minus, Trash2, FileText, Share2, MapPin, Phone, User, Check, X, Truck, DollarSign, Receipt, ArrowLeft } = lucide;
+        const jsPDF = window.jspdf.jsPDF;
+
+        // ----------------------------------------------------------------------------------
+        // --- INSERTA TU CONFIGURACIÓN DE FIREBASE AQUÍ ---
+        //
+        // **IMPORTANTE**: Reemplaza el objeto 'firebaseConfig' de ejemplo con tu configuración real.
+        // Si no tienes un initialAuthToken, déjalo como 'null'.
+        // ----------------------------------------------------------------------------------
+        
+        const firebaseConfig = {
+            apiKey: "TU_API_KEY_AQUI", // <--- REEMPLAZA ESTO
+            authDomain: "TU_AUTH_DOMAIN_AQUI", // <--- REEMPLAZA ESTO
+            projectId: "TU_PROJECT_ID_AQUI", // <--- REEMPLAZA ESTO
+            storageBucket: "...",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+        const initialAuthToken = null; // Puedes dejar esto como null si no usas autenticación custom.
+        const appId = 'ventas-app-demo'; // Define un ID para esta aplicación específica dentro de Firestore.
+
+        // ----------------------------------------------------------------------------------
+        // --- FIN DE LA CONFIGURACIÓN DE FIREBASE ---
+        // ----------------------------------------------------------------------------------
+
+
+        // --- Componente Icon (Adaptado para Lucide) ---
+        const Icon = ({ name: LucideIcon, size = 20, className = "" }) => {
+            if (!LucideIcon) return null;
+            // Lucide icons están disponibles como propiedades del objeto global 'lucide'
+            const IconComponent = lucide[LucideIcon];
+            if (!IconComponent) return null;
+            return <IconComponent size={size} className={className} />;
+        };
+
+        // --- COMPONENTE PRINCIPAL ---
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('shop'); // 'shop', 'order-detail'
+            const [products, setProducts] = useState([]);
+            const [cart, setCart] = useState([]);
+            const [isCartOpen, setIsCartOpen] = useState(false);
+            const [currentOrder, setCurrentOrder] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [firebaseReady, setFirebaseReady] = useState(false);
+            const [db, setDb] = useState(null);
+            const [auth, setAuth] = useState(null);
+
+            // --- 1. AUTENTICACIÓN E INICIALIZACIÓN ---
+            useEffect(() => {
+                // Verificar que la configuración mínima exista
+                if (!firebaseConfig.projectId || !firebaseConfig.apiKey) {
+                    console.error("ERROR: Configuración de Firebase incompleta. La aplicación no se iniciará. Revisa el bloque de configuración.");
+                    return;
+                }
+
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    const dbInstance = getFirestore(app);
+                    const authInstance = getAuth(app);
+                    
+                    setDb(dbInstance);
+                    setAuth(authInstance);
+
+                    const authenticate = async () => {
+                        try {
+                            if (initialAuthToken) {
+                                await signInWithCustomToken(authInstance, initialAuthToken);
+                            } else {
+                                // En un entorno de prueba, iniciamos sesión anónimamente para tener un 'uid'
+                                await signInAnonymously(authInstance);
+                            }
+                            setFirebaseReady(true);
+                        } catch (e) {
+                            console.error("Error al autenticar (Revisa tus reglas de seguridad):", e);
+                            setFirebaseReady(true); // Continuar si la autenticación falla
+                        }
+                    };
+
+                    authenticate();
+                    
+                    const unsubscribeAuth = onAuthStateChanged(authInstance, (u) => setUser(u));
+                    return () => unsubscribeAuth();
+
+                } catch (e) {
+                    console.error("Error al inicializar Firebase. Posiblemente un error en firebaseConfig:", e);
+                }
+            }, []);
+
+            // --- 2. CARGAR PRODUCTOS (PÚBLICOS) ---
+            useEffect(() => {
+                // Solo cargar datos si Firebase está inicializado y el usuario está autenticado
+                if (!user || !db || !firebaseReady) return;
+                
+                // Usamos colección PÚBLICA para que los productos sean globales
+                // Path: /artifacts/{appId}/public/data/products
+                const productsCollectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                const q = query(productsCollectionRef, orderBy('createdAt', 'desc'));
+
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setProducts(items);
+                }, (error) => console.error("Error en onSnapshot de productos (Verifica reglas):", error));
+
+                return () => unsubscribe();
+            }, [user, db, firebaseReady]);
+
+            // --- 3. GESTIÓN DE URL PARA ORDEN PÚBLICA ---
+            useEffect(() => {
+                if (!db || !firebaseReady) return;
+
+                const params = new URLSearchParams(window.location.search);
+                const orderId = params.get('orderId');
+                if (orderId) {
+                    loadPublicOrder(orderId);
+                }
+            }, [db, firebaseReady]);
+            
+            // --- FUNCIONES LOGICAS ---
+            const loadPublicOrder = useCallback(async (id) => {
+                if (!db) return;
+                try {
+                    // Path: /artifacts/{appId}/public/data/orders/{orderId}
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', id);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        setCurrentOrder({ id: docSnap.id, ...docSnap.data() });
+                        setView('order-detail');
+                    } else {
+                        // Usamos modal/alerta simulada en lugar de window.alert
+                        alert("La orden no existe o fue eliminada.");
+                        window.history.pushState({}, document.title, window.location.pathname);
+                        setView('shop');
+                    }
+                } catch (error) {
+                    console.error("Error cargando orden:", error);
+                }
+            }, [db]);
+
+            const addToCart = (product) => {
+                setCart(prev => {
+                    const exists = prev.find(p => p.id === product.id);
+                    if (exists) {
+                        return prev.map(p => p.id === product.id ? { ...p, qty: p.qty + 1 } : p);
+                    }
+                    return [...prev, { ...product, qty: 1 }];
+                });
+                setIsCartOpen(true);
+            };
+
+            const handleGoBack = () => {
+                window.history.pushState({}, document.title, window.location.pathname);
+                setView('shop');
+                setCurrentOrder(null);
+            };
+
+            // --- RENDERIZADO ---
+            if (!firebaseReady) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+                        <div className="p-6 bg-white rounded-xl shadow-lg">
+                            <h2 className="text-xl font-bold text-slate-800 mb-2">Cargando Sistema...</h2>
+                            <p className="text-sm text-slate-500">Si esto tarda, revisa la consola (F12) o verifica que hayas insertado correctamente tu `firebaseConfig`.</p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            // Si firebaseReady es true, pero no se pudo conectar al usuario, puede ser un problema de reglas.
+            if (!user && firebaseReady) {
+                 console.warn("Firebase listo, pero el usuario no pudo ser autenticado. Revisa tus reglas de Auth/Firestore.");
+            }
+
+            if (view === 'order-detail' && currentOrder) {
+                return <OrderReceipt order={currentOrder} onBack={handleGoBack} Icon={Icon} />;
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+                    {/* Navbar */}
+                    <nav className="bg-slate-900 text-white p-4 sticky top-0 z-30 shadow-md">
+                        <div className="max-w-6xl mx-auto flex justify-between items-center">
+                            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('shop')}>
+                                <Icon name="Package" className="text-blue-400" size={20} />
+                                <h1 className="font-bold text-xl">Ventas<span className="text-blue-400">App</span></h1>
+                            </div>
+                            
+                            <div className="flex items-center gap-4">
+                                <button 
+                                    onClick={() => setIsAdmin(!isAdmin)}
+                                    className={`text-xs px-3 py-1 rounded-full border transition-colors ${isAdmin ? 'bg-blue-600 border-blue-600' : 'border-slate-600 hover:bg-slate-800'}`}
+                                >
+                                    {isAdmin ? 'Modo Vendedor' : 'Vista Cliente'}
+                                </button>
+                                
+                                <button onClick={() => setIsCartOpen(true)} className="relative p-2 hover:bg-slate-800 rounded-full">
+                                    <Icon name="ShoppingCart" size={24} />
+                                    {cart.length > 0 && (
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                                            {cart.reduce((acc, item) => acc + item.qty, 0)}
+                                        </span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* Contenido Principal */}
+                    <main className="max-w-6xl mx-auto p-4 py-8">
+                        
+                        {isAdmin && (
+                            <div className="mb-8 p-6 bg-white rounded-xl shadow-sm border border-slate-200">
+                                <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                    <Icon name="Settings" size={20} className="text-blue-600"/> Gestión de Inventario (Vendedor)
+                                </h2>
+                                <AddProductForm db={db} user={user} firebaseReady={firebaseReady} Icon={Icon} appId={appId} collection={collection} addDoc={addDoc} serverTimestamp={serverTimestamp} />
+                            </div>
+                        )}
+
+                        {products.length === 0 ? (
+                            <div className="text-center py-20 text-slate-400">
+                                <Icon name="Package" size={48} className="mx-auto mb-4 opacity-50" />
+                                <p>No hay productos disponibles.</p>
+                                {isAdmin && <p className="text-sm">Agrega productos usando el panel de arriba.</p>}
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {products.map(product => (
+                                    <ProductCard 
+                                        key={product.id} 
+                                        product={product} 
+                                        onAdd={() => addToCart(product)}
+                                        onDelete={isAdmin ? async () => {
+                                            // Usamos confirm simulado/placeholder ya que alert/confirm están prohibidos
+                                            if(window.confirm('¿Estás seguro de que quieres borrar este producto?')) {
+                                                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', product.id));
+                                            }
+                                        } : null}
+                                        Icon={Icon}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </main>
+
+                    {/* Modal / Drawer del Carrito */}
+                    {isCartOpen && (
+                        <CheckoutDrawer 
+                            cart={cart} 
+                            setCart={setCart}
+                            onClose={() => setIsCartOpen(false)} 
+                            db={db}
+                            firebaseReady={firebaseReady}
+                            Icon={Icon}
+                            appId={appId}
+                            collection={collection}
+                            addDoc={addDoc}
+                            serverTimestamp={serverTimestamp}
+                        />
+                    )}
+                </div>
+            );
+        }
+
+        // --- COMPONENTE: TARJETA DE PRODUCTO ---
+        function ProductCard({ product, onAdd, onDelete, Icon }) {
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-md transition-shadow">
+                    <div className="h-32 bg-slate-100 flex items-center justify-center">
+                        <Icon name="Package" size={40} className="text-slate-300" />
+                    </div>
+                    <div className="p-4 flex flex-col flex-1">
+                        <div className="flex justify-between items-start mb-2">
+                            <h3 className="font-bold text-lg text-slate-800 leading-tight">{product.name}</h3>
+                            <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded text-sm">
+                                ${parseFloat(product.price).toFixed(2)}
+                            </span>
+                        </div>
+                        <div className="mt-auto pt-4 flex gap-2">
+                            <button 
+                                onClick={onAdd}
+                                className="flex-1 bg-slate-900 text-white py-2 rounded-lg font-medium hover:bg-slate-800 transition-colors flex justify-center items-center gap-2"
+                            >
+                                <Icon name="Plus" size={16} /> Agregar
+                            </button>
+                            {onDelete && (
+                                <button 
+                                    onClick={onDelete}
+                                    className="px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                                >
+                                    <Icon name="Trash2" size={18} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- COMPONENTE: FORMULARIO AGREGAR PRODUCTO ---
+        function AddProductForm({ db, user, firebaseReady, Icon, appId, collection, addDoc, serverTimestamp }) {
+            const [name, setName] = useState('');
+            const [price, setPrice] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!name || !price || !firebaseReady || !db) return;
+                
+                try {
+                    // Path: /artifacts/{appId}/public/data/products
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), {
+                        name,
+                        price: parseFloat(price),
+                        createdAt: serverTimestamp(),
+                        createdBy: user?.uid
+                    });
+                    setName('');
+                    setPrice('');
+                } catch (err) {
+                    console.error("Error al guardar producto:", err);
+                    window.alert("Error al guardar en Firestore (Revisa las reglas de escritura).");
+                }
+            };
+
+            return (
+                <form onSubmit={handleSubmit} className="flex gap-4 items-end flex-wrap">
+                    <div className="flex-1 min-w-[200px]">
+                        <label className="block text-sm font-medium text-slate-600 mb-1">Nombre</label>
+                        <input 
+                            value={name} onChange={e => setName(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Ej. Hamburguesa Doble"
+                            required
+                        />
+                    </div>
+                    <div className="w-32">
+                        <label className="block text-sm font-medium text-slate-600 mb-1">Precio</label>
+                        <input 
+                            type="number" step="0.01"
+                            value={price} onChange={e => setPrice(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="0.00"
+                            required
+                        />
+                    </div>
+                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50" disabled={!firebaseReady}>
+                        <Icon name="Plus" size={16} className="inline-block mr-1" /> Guardar
+                    </button>
+                </form>
+            );
+        }
+
+        // --- COMPONENTE: DRAWER DE CHECKOUT ---
+        function CheckoutDrawer({ cart, setCart, onClose, db, firebaseReady, Icon, appId, collection, addDoc, serverTimestamp }) {
+            const [step, setStep] = useState('cart'); // 'cart', 'form', 'success'
+            const [loading, setLoading] = useState(false);
+            const [orderId, setOrderId] = useState(null);
+
+            // Formulario
+            const [name, setName] = useState('');
+            const [isDelivery, setIsDelivery] = useState(false);
+            const [address, setAddress] = useState('');
+            const [phone, setPhone] = useState('');
+            const [shippingCost, setShippingCost] = useState(0);
+            const [applyTax, setApplyTax] = useState(false);
+
+            // Cálculos
+            const subtotal = useMemo(() => cart.reduce((sum, item) => sum + (item.price * item.qty), 0), [cart]);
+            const tax = useMemo(() => applyTax ? subtotal * 0.15 : 0, [subtotal, applyTax]);
+            const shipping = useMemo(() => isDelivery ? parseFloat(shippingCost || 0) : 0, [isDelivery, shippingCost]);
+            const total = useMemo(() => subtotal + tax + shipping, [subtotal, tax, shipping]);
+
+            const handleCreateOrder = async (e) => {
+                e.preventDefault();
+                if (!name) return window.alert("El nombre es obligatorio");
+                if (isDelivery && !address) return window.alert("La dirección es obligatoria para envíos");
+                if (!firebaseReady || !db) return window.alert("Sistema no listo. Intente de nuevo.");
+
+                setLoading(true);
+                try {
+                    const orderData = {
+                        items: cart,
+                        subtotal,
+                        tax,
+                        shipping,
+                        total,
+                        customerName: name,
+                        isDelivery,
+                        address: isDelivery ? address : '',
+                        phone: isDelivery ? phone : '',
+                        createdAt: serverTimestamp(),
+                        status: 'completed'
+                    };
+
+                    // Guardar en colección PÚBLICA de órdenes: /artifacts/{appId}/public/data/orders
+                    const ref = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderData);
+                    setOrderId(ref.id);
+                    setStep('success');
+                    setCart([]); // Limpiar carrito local después de la orden
+                } catch (err) {
+                    console.error("Error al crear la orden:", err);
+                    window.alert("Error al procesar la orden (Revisa las reglas de escritura de 'orders').");
+                }
+                setLoading(false);
+            };
+
+            const generateLink = () => `${window.location.origin}${window.location.pathname}?orderId=${orderId}`;
+
+            const sendWhatsApp = () => {
+                const text = `Hola *${name}*, tu pedido está listo.\n\n` +
+                `Total: $${total.toFixed(2)}\n` +
+                `Ver Factura: ${generateLink()}`;
+                // Reemplaza el número a continuación o déjalo vacío para que el usuario lo ingrese
+                const phoneNumber = phone ? phone.replace(/\D/g,'') : ''; 
+                const url = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(text)}`;
+                window.open(url, '_blank');
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 overflow-hidden">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+                    <div className="absolute inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl flex flex-col transform transition-transform slide-in-from-right">
+                        
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h2 className="font-bold text-lg text-slate-800">
+                                {step === 'cart' ? 'Tu Pedido' : step === 'form' ? 'Datos del Cliente' : 'Orden Creada'}
+                            </h2>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full">
+                                <Icon name="X" size={20} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto p-4">
+                            
+                            {step === 'cart' && (
+                                <>
+                                    {cart.length === 0 ? (
+                                        <p className="text-center text-slate-500 mt-10">El carrito está vacío.</p>
+                                    ) : (
+                                        <ul className="space-y-4">
+                                            {cart.map(item => (
+                                                <li key={item.id} className="flex justify-between items-center border-b border-slate-50 pb-4">
+                                                    <div>
+                                                        <p className="font-medium text-slate-900">{item.name}</p>
+                                                        <p className="text-sm text-slate-500">${item.price.toFixed(2)} x {item.qty}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-bold">${(item.price * item.qty).toFixed(2)}</span>
+                                                        <button onClick={() => setCart(c => c.filter(x => x.id !== item.id))} className="text-red-500 p-1 hover:bg-red-50 rounded">
+                                                            <Icon name="Trash2" size={16} />
+                                                        </button>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </>
+                            )}
+
+                            {step === 'form' && (
+                                <form id="checkout-form" onSubmit={handleCreateOrder} className="space-y-6">
+                                    
+                                    {/* Sección Datos Personales */}
+                                    <div className="space-y-3">
+                                        <label className="block text-sm font-medium text-slate-700">Nombre del Cliente <span className="text-red-500">*</span></label>
+                                        <div className="relative">
+                                            <Icon name="User" className="absolute top-2.5 left-3 text-slate-400" size={18} />
+                                            <input 
+                                                required
+                                                value={name} onChange={e => setName(e.target.value)}
+                                                className="pl-10 w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none" 
+                                                placeholder="Nombre completo para la factura"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Toggle Delivery */}
+                                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-100">
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="Truck" className="text-blue-600" size={20} />
+                                            <span className="font-medium text-blue-900">¿Es para envío? (Delivery)</span>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={isDelivery} onChange={e => setIsDelivery(e.target.checked)} className="sr-only peer" />
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                        </label>
+                                    </div>
+
+                                    {/* Campos Delivery Condicionales */}
+                                    {isDelivery && (
+                                        <div className="space-y-4 pl-4 border-l-2 border-blue-200 transition-all duration-300">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">Costo de Envío</label>
+                                                <div className="relative mt-1">
+                                                    <Icon name="DollarSign" className="absolute top-2.5 left-3 text-slate-400" size={18} />
+                                                    <input 
+                                                        type="number"
+                                                        min="0"
+                                                        value={shippingCost} onChange={e => setShippingCost(e.target.value)}
+                                                        className="pl-10 w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">Dirección de Entrega <span className="text-red-500">*</span></label>
+                                                <div className="relative mt-1">
+                                                    <Icon name="MapPin" className="absolute top-2.5 left-3 text-slate-400" size={18} />
+                                                    <input 
+                                                        required={isDelivery}
+                                                        value={address} onChange={e => setAddress(e.target.value)}
+                                                        className="pl-10 w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="Dirección exacta"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700">Teléfono (WhatsApp)</label>
+                                                <div className="relative mt-1">
+                                                    <Icon name="Phone" className="absolute top-2.5 left-3 text-slate-400" size={18} />
+                                                    <input 
+                                                        required={isDelivery}
+                                                        type="tel"
+                                                        value={phone} onChange={e => setPhone(e.target.value)}
+                                                        className="pl-10 w-full border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                                        placeholder="Ej. 8888-8888"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                        </div>
+                                    )}
+
+                                    {/* Toggle Impuesto */}
+                                    <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                        <span className="text-sm font-medium text-slate-600">Aplicar Impuesto (15%)</span>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" checked={applyTax} onChange={e => setApplyTax(e.target.checked)} className="sr-only peer" />
+                                            <div className="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-slate-800"></div>
+                                        </label>
+                                    </div>
+
+                                </form>
+                            )}
+
+                            {step === 'success' && (
+                                <div className="text-center py-10">
+                                    <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                        <Icon name="Check" size={40} />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-slate-900 mb-2">¡Orden Lista!</h3>
+                                    <p className="text-slate-500 mb-8">La orden ha sido registrada. Puedes compartir el detalle.</p>
+                                    
+                                    <div className="space-y-3">
+                                        <button onClick={sendWhatsApp} className="w-full py-3 bg-green-500 text-white rounded-lg font-bold hover:bg-green-600 flex items-center justify-center gap-2">
+                                            <Icon name="Share2" size={20} /> Enviar a WhatsApp
+                                        </button>
+                                        <a href={generateLink()} target="_blank" rel="noreferrer" className="w-full block py-3 bg-slate-100 text-slate-700 rounded-lg font-bold hover:bg-slate-200">
+                                            Ver Factura Digital
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer Totals */}
+                        {step !== 'success' && cart.length > 0 && (
+                            <div className="p-4 border-t border-slate-100 bg-slate-50">
+                                <div className="space-y-1 mb-4 text-sm">
+                                    <div className="flex justify-between text-slate-500">
+                                        <span>Subtotal</span>
+                                        <span>${subtotal.toFixed(2)}</span>
+                                    </div>
+                                    {tax > 0 && (
+                                        <div className="flex justify-between text-slate-600">
+                                            <span>Impuesto (15%)</span>
+                                            <span>+${tax.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {isDelivery && shipping > 0 && (
+                                        <div className="flex justify-between text-blue-600">
+                                            <span>Envío</span>
+                                            <span>+${shipping.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between font-bold text-slate-900 text-xl pt-2 mt-2 border-t border-slate-200">
+                                        <span>Total</span>
+                                        <span>${total.toFixed(2)}</span>
+                                    </div>
+                                </div>
+                                
+                                {step === 'cart' ? (
+                                    <button onClick={() => setStep('form')} className="w-full py-3 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition-colors">
+                                        Continuar
+                                    </button>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setStep('cart')} className="w-1/3 py-3 bg-white border border-slate-300 text-slate-700 rounded-lg font-bold hover:bg-slate-50">
+                                            <Icon name="ArrowLeft" size={16} />
+                                        </button>
+                                        <button 
+                                            onClick={handleCreateOrder} 
+                                            disabled={loading || !name || (isDelivery && !address)}
+                                            className="w-2/3 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            {loading ? 'Procesando...' : 'Confirmar Pedido'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- COMPONENTE: VISTA DE FACTURA (PÚBLICA) ---
+        function OrderReceipt({ order, onBack, Icon }) {
+            const downloadPDF = () => {
+                if (!order || !order.items) {
+                    console.error("No hay datos de la orden para generar PDF.");
+                    return;
+                }
+
+                // Inicialización de jsPDF
+                const doc = new jsPDF();
+                
+                doc.setFontSize(22);
+                doc.text("Factura de Compra", 20, 20);
+                doc.setFontSize(12);
+                doc.text(`ID: ${order.id.slice(0, 8)}`, 20, 30);
+                doc.text(`Cliente: ${order.customerName}`, 20, 40);
+                if(order.isDelivery) {
+                    doc.text(`Dirección: ${order.address}`, 20, 48);
+                    doc.text(`Tel: ${order.phone || 'N/A'}`, 20, 56);
+                }
+
+                let y = 70;
+                doc.setFont(undefined, 'bold');
+                doc.text("Producto", 20, y);
+                doc.text("Cant", 120, y);
+                doc.text("Total", 160, y);
+                doc.line(20, y+2, 190, y+2);
+                
+                doc.setFont(undefined, 'normal');
+                y += 8;
+                
+                order.items.forEach((item) => {
+                    doc.text(`${item.name}`, 20, y);
+                    doc.text(`${item.qty}`, 120, y, { align: 'center' });
+                    doc.text(`$${(item.price * item.qty).toFixed(2)}`, 160, y, { align: 'right' });
+                    y += 6;
+                });
+
+                y += 5;
+                doc.line(120, y, 190, y); // Línea de separación para totales
+                y += 5;
+
+                doc.text(`Subtotal:`, 120, y, { align: 'left' });
+                doc.text(`$${order.subtotal.toFixed(2)}`, 160, y, { align: 'right' });
+                y += 5;
+
+                if(order.tax > 0) {
+                    doc.text(`IVA (15%):`, 120, y, { align: 'left' });
+                    doc.text(`+ $${order.tax.toFixed(2)}`, 160, y, { align: 'right' });
+                    y += 5;
+                }
+                if(order.shipping > 0) {
+                    doc.text(`Envío:`, 120, y, { align: 'left' });
+                    doc.text(`+ $${order.shipping.toFixed(2)}`, 160, y, { align: 'right' });
+                    y += 5;
+                }
+                
+                doc.setFont(undefined, 'bold');
+                doc.text(`TOTAL:`, 120, y, { align: 'left' });
+                doc.text(`$${order.total.toFixed(2)}`, 160, y, { align: 'right' });
+
+                doc.save(`Factura_${order.id.slice(0,6)}.pdf`);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+                    <div className="bg-white max-w-lg w-full rounded-2xl shadow-xl overflow-hidden">
+                        <div className="bg-slate-900 text-white p-6 relative">
+                            <button onClick={onBack} className="absolute top-6 left-4 hover:bg-white/20 p-1 rounded-full">
+                                <Icon name="ArrowLeft" size={20} />
+                            </button>
+                            <div className="text-center">
+                                <Icon name="Receipt" size={48} className="mx-auto mb-2 opacity-80" />
+                                <h1 className="text-2xl font-bold">Detalle de Orden</h1>
+                                <p className="opacity-70 text-sm">Orden #<span className="font-mono">{order.id.slice(0, 8)}</span></p>
+                            </div>
+                        </div>
+                        
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-6 pb-6 border-b border-slate-100">
+                                <div>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Cliente</p>
+                                    <p className="font-bold text-lg text-slate-900">{order.customerName}</p>
+                                    {order.isDelivery && (
+                                        <p className="text-sm text-slate-500 mt-1 flex items-center gap-1">
+                                            <Icon name="MapPin" size={14} /> {order.address}
+                                        </p>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha</p>
+                                    <p className="text-slate-700 font-medium">
+                                        {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : 'Desconocida'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <table className="w-full text-sm mb-6">
+                                <thead className="bg-slate-50 text-slate-500">
+                                    <tr>
+                                        <th className="py-2 px-2 text-left rounded-l-md">Descripción</th>
+                                        <th className="py-2 px-2 text-center">Cant.</th>
+                                        <th className="py-2 px-2 text-right rounded-r-md">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {order.items.map((item, i) => (
+                                        <tr key={i}>
+                                            <td className="py-3 px-2 text-slate-800">{item.name}</td>
+                                            <td className="py-3 px-2 text-center text-slate-500">{item.qty}</td>
+                                            <td className="py-3 px-2 text-right font-medium">${(item.price * item.qty).toFixed(2)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+
+                            <div className="space-y-2 border-t border-slate-100 pt-4 text-slate-600">
+                                <div className="flex justify-between">
+                                    <span>Subtotal</span>
+                                    <span>${order.subtotal.toFixed(2)}</span>
+                                </div>
+                                {order.tax > 0 && (
+                                    <div className="flex justify-between">
+                                    <span>Impuesto (15%)</span>
+                                    <span>+${order.tax.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                {order.shipping > 0 && (
+                                    <div className="flex justify-between">
+                                    <span>Envío</span>
+                                    <span>+${order.shipping.toFixed(2)}</span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between font-bold text-slate-900 text-xl pt-2 mt-2 border-t border-slate-200">
+                                    <span>Total</span>
+                                    <span>${order.total.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={downloadPDF}
+                                className="w-full mt-8 bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 flex items-center justify-center gap-2"
+                            >
+                                <Icon name="FileText" size={20} /> Descargar Factura PDF
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Inicializar la aplicación React en el DOM
+        window.onload = () => {
+             const container = document.getElementById('root');
+             const root = ReactDOM.createRoot(container);
+             root.render(<App />);
+        }
+    </script>
+</body>
+</html>
+
