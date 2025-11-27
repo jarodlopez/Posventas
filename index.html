@@ -2,333 +2,375 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>POS Sistema de Ventas - Reparado</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>POS Móvil Pro</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Iconos Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- ESTILOS CSS -->
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
         
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
 
-        /* Scrollbar personalizado */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #c7c7c7; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }
+        /* Ajustes Mobile */
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+        
+        /* Ocultar scrollbar pero permitir scroll */
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 
-        /* Loader simple */
+        /* Animaciones */
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* Loader */
         .loader {
-            border: 3px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 3px solid #4f46e5;
-            width: 20px;
-            height: 20px;
-            -webkit-animation: spin 1s linear infinite; /* Safari */
+            border: 3px solid #f3f3f3; border-top: 3px solid #6366f1;
+            border-radius: 50%; width: 24px; height: 24px;
             animation: spin 1s linear infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* REGLAS PARA IMPRESIÓN (FACTURA) */
+        /* Input Styles para evitar zoom en iOS */
+        input, select, textarea { font-size: 16px !important; }
+
+        /* IMPRESIÓN */
         @media print {
             body > *:not(#invoice-view) { display: none !important; }
-            #invoice-view {
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-                background: white; display: block !important;
-                overflow: visible; padding: 0; margin: 0; z-index: 9999;
-            }
-            #printable-area { box-shadow: none; max-width: 100%; width: 100%; margin: 0; padding: 20px; }
-            .print\:hidden { display: none !important; }
+            #invoice-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: white; display: block !important; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-900 font-sans overflow-hidden">
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
 
-    <!-- PANTALLA DE CARGA INICIAL -->
-    <div id="loading-screen" class="fixed inset-0 z-[60] bg-white flex items-center justify-center">
-        <div class="flex flex-col items-center">
-            <div class="loader w-10 h-10 border-4 mb-4"></div>
-            <p class="text-gray-500 font-medium">Cargando sistema...</p>
-        </div>
-    </div>
-
-    <!-- 1. PANTALLA DE LOGIN -->
-    <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden">
-        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
-            <h2 class="text-3xl font-bold text-center mb-6 text-indigo-600">POS Login</h2>
-            
-            <form id="login-form" class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Email</label>
-                    <input type="email" id="login-email" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
+    <!-- LOGIN SCREEN -->
+    <div id="auth-screen" class="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center p-6 hidden">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-8">
+                <div class="bg-indigo-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-200">
+                    <i data-lucide="store" class="text-white w-8 h-8"></i>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Contraseña</label>
-                    <input type="password" id="login-pass" class="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500" required>
-                </div>
-                <button type="submit" id="btn-login-submit" class="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700 font-bold flex justify-center items-center gap-2">
-                    Entrar
-                </button>
-            </form>
-
-            <div class="mt-4 text-center border-t pt-4">
-                <p class="text-sm text-gray-500">¿No tienes cuenta?</p>
-                <button id="show-register-btn" class="text-indigo-600 font-medium text-sm">Registrar nuevo usuario</button>
+                <h1 class="text-3xl font-bold text-gray-900">Bienvenido</h1>
+                <p class="text-gray-500 mt-2">Sistema POS & Inventario</p>
             </div>
 
-            <!-- Formulario Registro -->
-            <form id="register-form" class="space-y-4 mt-4 hidden">
-                <h3 class="text-lg font-bold">Crear Usuario</h3>
-                <input type="email" id="reg-email" placeholder="Email" class="w-full border p-2 rounded" required>
-                <input type="password" id="reg-pass" placeholder="Contraseña" class="w-full border p-2 rounded" required>
-                <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Registrar</button>
-                <button type="button" id="cancel-reg-btn" class="w-full text-gray-500 text-sm mt-2">Cancelar</button>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                    <input type="email" id="login-email" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="admin@tienda.com" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                    <input type="password" id="login-pass" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" placeholder="••••••" required>
+                </div>
+                <button type="submit" id="btn-login" class="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl hover:bg-indigo-700 active:scale-95 transition shadow-lg shadow-indigo-200">
+                    Iniciar Sesión
+                </button>
             </form>
+            
+            <button id="toggle-auth" class="mt-6 text-sm text-indigo-600 font-medium w-full text-center py-2">
+                ¿No tienes cuenta? Regístrate
+            </button>
         </div>
     </div>
 
-    <!-- 2. APLICACIÓN PRINCIPAL -->
-    <div id="app-screen" class="flex h-screen hidden">
-        
-        <!-- Sidebar Menú -->
-        <nav class="w-20 bg-gray-900 flex flex-col items-center py-6 gap-6 text-gray-400 shrink-0 print:hidden">
-            <div class="text-white font-bold text-xl mb-4">POS</div>
-            <button onclick="window.switchView('pos')" class="p-3 rounded-xl bg-indigo-600 text-white hover:bg-gray-800 transition" id="nav-pos" title="Ventas"><i data-lucide="shopping-cart"></i></button>
-            <button onclick="window.switchView('inventory')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-inv" title="Inventario"><i data-lucide="package"></i></button>
-            <button onclick="window.switchView('orders')" class="p-3 rounded-xl hover:bg-gray-800 hover:text-white transition" id="nav-orders" title="Historial"><i data-lucide="file-text"></i></button>
+    <!-- MAIN APP LAYOUT -->
+    <div id="app-screen" class="flex-1 flex flex-col md:flex-row h-full relative hidden">
+
+        <!-- DESKTOP SIDEBAR (Solo visible en md+) -->
+        <nav class="hidden md:flex w-64 bg-white border-r flex-col p-4 z-20">
+            <div class="flex items-center gap-3 px-2 mb-8 mt-2">
+                <div class="bg-indigo-600 p-2 rounded-lg"><i data-lucide="store" class="text-white w-5 h-5"></i></div>
+                <span class="font-bold text-xl">Mi Tienda</span>
+            </div>
+            
+            <div class="space-y-1">
+                <button onclick="navTo('pos')" id="d-nav-pos" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
+                    <i data-lucide="layout-grid" class="w-5 h-5"></i> Ventas
+                </button>
+                <button onclick="navTo('inventory')" id="d-nav-inventory" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
+                    <i data-lucide="package" class="w-5 h-5"></i> Inventario
+                </button>
+                <button onclick="navTo('orders')" id="d-nav-orders" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-gray-600 hover:bg-gray-100 transition font-medium">
+                    <i data-lucide="history" class="w-5 h-5"></i> Historial
+                </button>
+            </div>
+
             <div class="mt-auto">
-                <button id="logout-btn" class="p-3 rounded-xl hover:bg-red-900 text-red-400 transition" title="Salir"><i data-lucide="log-out"></i></button>
+                <div class="bg-gray-50 p-3 rounded-xl mb-4">
+                    <p id="user-email-display" class="text-xs text-gray-500 truncate font-medium">usuario@email.com</p>
+                </div>
+                <button id="btn-logout" class="w-full flex items-center gap-2 text-red-500 px-4 py-2 hover:bg-red-50 rounded-lg transition text-sm font-bold">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Cerrar Sesión
+                </button>
             </div>
         </nav>
 
-        <!-- Contenido -->
-        <main class="flex-1 overflow-hidden relative">
+        <!-- MAIN CONTENT AREA -->
+        <main class="flex-1 relative overflow-hidden bg-gray-50 flex flex-col">
             
-            <!-- VISTA POS (Ventas) -->
-            <div id="view-pos" class="h-full flex flex-col md:flex-row">
-                <!-- Catálogo -->
-                <div class="flex-1 p-6 overflow-y-auto bg-gray-100 relative">
-                    <header class="flex justify-between items-center mb-6 sticky top-0 z-10 bg-gray-100 py-2">
-                        <h2 class="text-2xl font-bold text-gray-800">Ventas</h2>
-                        <input type="text" id="search-input" placeholder="Buscar producto..." class="border p-2 rounded-full px-4 w-64 shadow-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                    </header>
-                    <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-20">
-                        <!-- Productos aquí -->
-                        <div class="col-span-full text-center text-gray-400 py-10">Cargando productos...</div>
+            <!-- VIEW: POS (Ventas) -->
+            <div id="view-pos" class="absolute inset-0 flex flex-col md:flex-row fade-in">
+                <!-- Header Móvil -->
+                <div class="md:hidden bg-white p-4 flex items-center justify-between border-b shadow-sm z-10">
+                    <h1 class="font-bold text-lg">Punto de Venta</h1>
+                    <div class="relative">
+                        <i data-lucide="shopping-cart" class="text-gray-700 w-6 h-6" onclick="navTo('cart')"></i>
+                        <span id="badge-cart-mobile" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full hidden">0</span>
                     </div>
                 </div>
 
-                <!-- Carrito -->
-                <div class="w-full md:w-96 bg-white shadow-xl border-l flex flex-col z-20 h-[40vh] md:h-full">
-                    <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
-                        <h3 class="font-bold flex gap-2"><i data-lucide="shopping-cart"></i> Ticket</h3>
-                        <span id="cart-count" class="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full">0</span>
-                    </div>
-                    <div id="cart-items" class="flex-1 overflow-y-auto p-4 space-y-2">
-                        <p class="text-center text-gray-400 mt-10">Carrito vacío</p>
-                    </div>
-                    <div class="p-4 bg-gray-50 border-t space-y-2">
-                        <input type="text" id="customer-name" placeholder="Nombre Cliente (Opcional)" class="w-full border p-2 rounded text-sm mb-2">
-                        <div class="flex gap-2">
-                            <input type="number" id="discount-input" placeholder="Desc. ($)" class="w-full border p-2 rounded text-sm">
-                            <input type="number" id="delivery-input" placeholder="Envío ($)" class="w-full border p-2 rounded text-sm">
+                <!-- Buscador y Grid -->
+                <div class="flex-1 flex flex-col overflow-hidden">
+                    <div class="p-4 pb-2">
+                        <div class="relative">
+                            <i data-lucide="search" class="absolute left-3 top-3 text-gray-400 w-5 h-5"></i>
+                            <input type="text" id="search-pos" placeholder="Buscar por nombre, marca..." class="w-full bg-white border-none shadow-sm rounded-xl py-3 pl-10 pr-4 focus:ring-2 focus:ring-indigo-500 outline-none">
                         </div>
-                        <div class="flex justify-between text-lg font-bold border-t pt-2">
-                            <span>Total:</span>
-                            <span id="cart-total">$0.00</span>
-                        </div>
-                        <button onclick="window.processCheckout()" id="btn-checkout" class="w-full bg-indigo-600 text-white py-3 rounded font-bold hover:bg-indigo-700 transition flex justify-center gap-2">
-                            COBRAR
-                        </button>
+                    </div>
+
+                    <!-- Lista de Productos (Grid Responsivo) -->
+                    <div id="pos-grid" class="flex-1 overflow-y-auto p-4 grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 content-start pb-24 md:pb-4">
+                        <!-- Items inyectados por JS -->
+                    </div>
+                </div>
+
+                <!-- CARRITO (Sidebar en Desktop, Vista separada en Móvil) -->
+                <div class="hidden md:flex w-96 bg-white border-l flex-col shadow-xl z-20">
+                    <div class="p-5 border-b bg-gray-50 flex justify-between items-center">
+                        <h2 class="font-bold text-lg flex items-center gap-2"><i data-lucide="shopping-cart" class="w-5 h-5"></i> Ticket Actual</h2>
+                        <button onclick="clearCart()" class="text-xs text-red-500 hover:text-red-700 font-medium">Vaciar</button>
+                    </div>
+                    <!-- Lista Items Desktop -->
+                    <div id="cart-items-desktop" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+                    <!-- Checkout Footer Desktop -->
+                    <div class="p-5 bg-gray-50 border-t space-y-3">
+                        <div id="cart-summary-desktop"></div>
+                        <button onclick="processSale()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">COBRAR</button>
                     </div>
                 </div>
             </div>
 
-            <!-- VISTA INVENTARIO -->
-            <div id="view-inventory" class="h-full p-6 overflow-y-auto hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold">Inventario</h2>
-                    <button onclick="window.toggleModal('modal-product')" class="bg-green-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-green-700 shadow-lg transition">
-                        <i data-lucide="plus"></i> Nuevo Producto
+            <!-- VIEW: CART (Solo Móvil) -->
+            <div id="view-cart" class="absolute inset-0 flex flex-col bg-white z-30 hidden fade-in md:hidden">
+                <div class="p-4 border-b flex items-center justify-between bg-white shadow-sm sticky top-0 z-10">
+                    <h1 class="font-bold text-xl">Carrito de Compra</h1>
+                    <button onclick="clearCart()" class="text-red-500 text-sm font-medium">Limpiar</button>
+                </div>
+                
+                <div id="cart-items-mobile" class="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
+                    <!-- Items inyectados -->
+                    <div class="flex flex-col items-center justify-center h-64 text-gray-400">
+                        <i data-lucide="shopping-cart" class="w-12 h-12 mb-2 opacity-50"></i>
+                        <p>Carrito vacío</p>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-[60px] left-0 w-full bg-white border-t p-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                     <div class="space-y-2 mb-3">
+                        <div class="flex justify-between text-sm"><span>Subtotal</span> <span id="m-subtotal">$0.00</span></div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Descuento</span>
+                            <input type="number" id="m-discount" class="w-20 text-right border rounded p-1 text-sm" placeholder="0.00">
+                        </div>
+                        <div class="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t"><span>Total</span> <span id="m-total">$0.00</span></div>
+                    </div>
+                    <button onclick="processSale()" class="w-full bg-indigo-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-indigo-200 active:scale-95 transition">
+                        Cobrar
                     </button>
                 </div>
-                <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-600">
-                                <tr>
-                                    <th class="p-4">Producto</th>
-                                    <th class="p-4">Categoría</th>
-                                    <th class="p-4 text-right">Costo</th>
-                                    <th class="p-4 text-right">Precio</th>
-                                    <th class="p-4 text-center">Stock</th>
-                                    <th class="p-4 text-right">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="inventory-table-body" class="divide-y divide-gray-100">
-                                <!-- Filas de inventario -->
-                            </tbody>
-                        </table>
+            </div>
+
+            <!-- VIEW: INVENTORY -->
+            <div id="view-inventory" class="absolute inset-0 flex flex-col hidden fade-in bg-gray-50">
+                <div class="p-4 bg-white border-b flex justify-between items-center sticky top-0 z-10 shadow-sm">
+                    <h1 class="font-bold text-lg md:text-2xl">Inventario</h1>
+                    <button onclick="openProductModal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition">
+                        <i data-lucide="plus" class="w-4 h-4"></i> <span class="hidden md:inline">Nuevo Producto</span><span class="md:hidden">Nuevo</span>
+                    </button>
+                </div>
+                
+                <div class="p-4 flex-1 overflow-y-auto pb-24">
+                    <!-- Cards de Inventario -->
+                    <div id="inventory-list" class="space-y-3 md:grid md:grid-cols-2 lg:grid-cols-3 md:space-y-0 md:gap-4">
+                        <!-- Inyectado JS -->
                     </div>
                 </div>
             </div>
 
-            <!-- VISTA HISTORIAL VENTAS -->
-            <div id="view-orders" class="h-full p-6 overflow-y-auto hidden">
-                <h2 class="text-2xl font-bold mb-6">Historial de Ventas</h2>
-                <div class="bg-white rounded-xl shadow-sm overflow-hidden border">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left">
-                            <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-600">
-                                <tr>
-                                    <th class="p-4">ID</th>
-                                    <th class="p-4">Fecha</th>
-                                    <th class="p-4">Cliente</th>
-                                    <th class="p-4 text-right">Total</th>
-                                    <th class="p-4 text-center">Ver</th>
-                                </tr>
-                            </thead>
-                            <tbody id="orders-table-body" class="divide-y divide-gray-100">
-                                <!-- Ordenes -->
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- VIEW: ORDERS -->
+            <div id="view-orders" class="absolute inset-0 flex flex-col hidden fade-in bg-gray-50">
+                <div class="p-4 bg-white border-b sticky top-0 z-10 shadow-sm">
+                    <h1 class="font-bold text-lg md:text-2xl">Historial de Ventas</h1>
+                </div>
+                <div id="orders-list" class="flex-1 overflow-y-auto p-4 space-y-3 pb-24">
+                    <!-- Orders List -->
                 </div>
             </div>
 
         </main>
+
+        <!-- MOBILE BOTTOM NAV (Solo visible en móviles) -->
+        <div class="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around items-center py-2 pb-safe z-40 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+            <button onclick="navTo('pos')" id="m-nav-pos" class="flex flex-col items-center p-2 text-indigo-600 transition">
+                <i data-lucide="store" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Ventas</span>
+            </button>
+            <button onclick="navTo('cart')" id="m-nav-cart" class="flex flex-col items-center p-2 text-gray-400 transition relative">
+                <i data-lucide="shopping-cart" class="w-6 h-6 mb-1"></i>
+                <span id="badge-nav" class="absolute top-1 right-2 bg-red-500 text-white text-[9px] w-3.5 h-3.5 rounded-full flex items-center justify-center hidden">0</span>
+                <span class="text-[10px] font-medium">Carrito</span>
+            </button>
+            <button onclick="navTo('inventory')" id="m-nav-inventory" class="flex flex-col items-center p-2 text-gray-400 transition">
+                <i data-lucide="package" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Stock</span>
+            </button>
+            <button onclick="navTo('orders')" id="m-nav-orders" class="flex flex-col items-center p-2 text-gray-400 transition">
+                <i data-lucide="file-clock" class="w-6 h-6 mb-1"></i>
+                <span class="text-[10px] font-medium">Historial</span>
+            </button>
+        </div>
+
     </div>
 
-    <!-- 3. VISTA DE FACTURA -->
-    <div id="invoice-view" class="fixed inset-0 bg-gray-900/90 z-[100] overflow-y-auto hidden flex flex-col items-center p-4">
-        <div class="w-full max-w-2xl bg-white shadow-2xl p-10 min-h-[600px] relative rounded-lg print:w-full print:shadow-none print:p-0" id="printable-area">
-            
-            <div class="absolute top-4 right-4 flex gap-2 print:hidden">
-                <button onclick="window.closeInvoice()" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 font-medium">Cerrar</button>
-                <button onclick="window.print()" class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-1 font-medium"><i data-lucide="printer" class="w-4 h-4"></i> Imprimir</button>
-                <button onclick="window.copyInvoiceLink()" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1 font-medium"><i data-lucide="link" class="w-4 h-4"></i> Link</button>
-            </div>
-
-            <!-- Cabecera Factura -->
-            <div class="border-b-2 border-gray-800 pb-6 mb-6 flex justify-between items-start">
-                <div>
-                    <h1 class="text-4xl font-bold text-gray-900 tracking-tight">FACTURA</h1>
-                    <p id="inv-id" class="text-gray-500 text-sm mt-1 font-mono">#ID</p>
-                </div>
-                <div class="text-right">
-                    <h2 class="text-xl font-bold text-indigo-600">Mi Tienda POS</h2>
-                    <p class="text-sm text-gray-500">Sistema de Ventas</p>
-                    <p class="text-sm text-gray-500">Estelí, Nicaragua</p>
-                </div>
-            </div>
-
-            <div class="flex justify-between mb-8 bg-gray-50 p-4 rounded-lg">
-                <div>
-                    <p class="text-xs uppercase font-bold text-gray-500">Cliente</p>
-                    <p id="inv-customer" class="text-lg font-bold text-gray-800">Nombre</p>
-                </div>
-                <div class="text-right">
-                    <p class="text-xs uppercase font-bold text-gray-500">Fecha de Emisión</p>
-                    <p id="inv-date" class="font-medium">00/00/0000</p>
-                </div>
-            </div>
-
-            <table class="w-full mb-8">
-                <thead>
-                    <tr class="border-b-2 border-gray-100 text-sm font-bold text-gray-600 uppercase">
-                        <td class="py-3 pl-2">Descripción</td>
-                        <td class="py-3 text-center">Cant</td>
-                        <td class="py-3 text-right">Precio Unit.</td>
-                        <td class="py-3 text-right pr-2">Total</td>
-                    </tr>
-                </thead>
-                <tbody id="inv-items" class="text-sm text-gray-700">
-                    <!-- Items -->
-                </tbody>
-            </table>
-
-            <div class="flex justify-end border-t pt-6">
-                <div class="w-full md:w-1/2 space-y-2 text-right">
-                    <div class="flex justify-between text-gray-600"><span>Subtotal:</span> <span id="inv-subtotal" class="font-medium">$0.00</span></div>
-                    <div class="flex justify-between text-green-600 hidden" id="inv-row-disc"><span>Descuento:</span> <span id="inv-disc">-$0.00</span></div>
-                    <div class="flex justify-between text-blue-600 hidden" id="inv-row-del"><span>Envío:</span> <span id="inv-del">+$0.00</span></div>
-                    <div class="flex justify-between text-2xl font-extrabold mt-4 pt-4 border-t border-gray-200 text-gray-900"><span>Total:</span> <span id="inv-total">$0.00</span></div>
-                </div>
+    <!-- MODAL PRODUCTO (Formulario Completo) -->
+    <div id="modal-product" class="fixed inset-0 z-50 bg-black/50 hidden flex items-end md:items-center justify-center backdrop-blur-sm">
+        <div class="bg-white w-full md:w-[600px] h-[90vh] md:h-auto rounded-t-2xl md:rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+                <h3 class="font-bold text-lg" id="modal-title">Nuevo Producto</h3>
+                <button onclick="closeProductModal()" class="p-2 bg-gray-200 rounded-full hover:bg-gray-300"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
             
-            <p class="mt-12 text-center text-xs text-gray-400">Gracias por su preferencia.</p>
+            <div class="flex-1 overflow-y-auto p-6">
+                <form id="product-form" class="space-y-5">
+                    <input type="hidden" name="id" id="prod-id">
+                    
+                    <!-- Sección Principal -->
+                    <div>
+                        <label class="label-input">Nombre del Producto *</label>
+                        <input name="name" required class="input-field" placeholder="Ej: Zapatillas Running">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="label-input">Marca</label>
+                            <input name="brand" class="input-field" placeholder="Ej: Nike">
+                        </div>
+                        <div>
+                            <label class="label-input">Categoría</label>
+                            <input name="category" list="categories" class="input-field" placeholder="Ej: Calzado">
+                            <datalist id="categories">
+                                <option value="Ropa"></option>
+                                <option value="Calzado"></option>
+                                <option value="Accesorios"></option>
+                                <option value="Electrónica"></option>
+                            </datalist>
+                        </div>
+                    </div>
+
+                    <!-- Precios y Stock -->
+                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="label-input text-indigo-900">Costo Unitario ($) *</label>
+                                <input type="number" step="0.01" name="cost" required class="input-field border-indigo-200 focus:ring-indigo-500" placeholder="0.00">
+                            </div>
+                            <div>
+                                <label class="label-input text-indigo-900">Precio Venta ($) *</label>
+                                <input type="number" step="0.01" name="price" required class="input-field border-indigo-200 focus:ring-indigo-500 font-bold" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="label-input text-indigo-900">Stock Actual *</label>
+                                <input type="number" name="stock" required class="input-field border-indigo-200" placeholder="0">
+                            </div>
+                            <div>
+                                <label class="label-input text-indigo-900">Stock Mínimo</label>
+                                <input type="number" name="minStock" class="input-field border-indigo-200" placeholder="5">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detalles Visuales -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="label-input">Color</label>
+                            <input name="color" class="input-field" placeholder="Ej: Negro/Blanco">
+                        </div>
+                        <div>
+                            <label class="label-input">Talla / Medida</label>
+                            <input name="size" class="input-field" placeholder="Ej: 42, M, XL">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="label-input">URL Imagen (Opcional)</label>
+                        <input name="imageUrl" class="input-field" placeholder="https://ejemplo.com/foto.jpg">
+                    </div>
+                </form>
+            </div>
+
+            <div class="p-4 border-t bg-gray-50 flex gap-3">
+                <button onclick="closeProductModal()" class="flex-1 py-3 rounded-xl border border-gray-300 font-bold text-gray-600">Cancelar</button>
+                <button onclick="submitProduct()" class="flex-1 py-3 rounded-xl bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-200">Guardar</button>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL AGREGAR PRODUCTO -->
-    <div id="modal-product" class="fixed inset-0 bg-black/60 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-        <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all">
-            <h3 class="text-xl font-bold mb-4 text-gray-800">Añadir Nuevo Producto</h3>
-            <form id="product-form" class="space-y-4">
-                <input type="hidden" name="id" id="prod-id">
-                
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">Nombre del Producto</label>
-                    <input required name="name" placeholder="Ej: Camisa Polo Talla M" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition">
+    <!-- FACTURA MODAL (Overlay) -->
+    <div id="invoice-view" class="fixed inset-0 bg-white z-[100] hidden overflow-y-auto">
+        <div class="max-w-2xl mx-auto min-h-screen bg-white p-6 relative">
+            <div class="no-print absolute top-4 right-4 flex gap-2">
+                <button onclick="closeInvoice()" class="bg-gray-100 p-2 rounded-lg"><i data-lucide="x" class="w-5 h-5"></i></button>
+                <button onclick="window.print()" class="bg-indigo-600 text-white p-2 rounded-lg"><i data-lucide="printer" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="text-center mb-8 mt-4">
+                <h2 class="text-2xl font-bold uppercase tracking-widest text-gray-800">Factura</h2>
+                <p class="text-sm text-gray-500 mt-1" id="inv-date">Fecha</p>
+                <p class="text-xs text-gray-400 font-mono mt-1" id="inv-id">#ID</p>
+            </div>
+
+            <div class="border-t border-b border-dashed border-gray-300 py-4 mb-4">
+                <div class="flex justify-between text-sm font-bold text-gray-700 mb-2">
+                    <span>Producto</span>
+                    <span>Total</span>
                 </div>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1">Precio Venta ($)</label>
-                        <input required type="number" step="0.01" name="price" placeholder="0.00" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1">Costo ($)</label>
-                        <input required type="number" step="0.01" name="cost" placeholder="0.00" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
+                <div id="inv-items" class="space-y-2 text-sm text-gray-600">
+                    <!-- Items Factura -->
                 </div>
-                
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1">Stock Inicial</label>
-                        <input required type="number" name="stock" placeholder="0" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-gray-500 mb-1">Categoría</label>
-                        <input required name="category" placeholder="Ej: Ropa" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                    </div>
-                </div>
-                
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 mb-1">URL Imagen (Opcional)</label>
-                    <input name="imageUrl" placeholder="https://..." class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
-                </div>
-                
-                <div class="flex gap-3 mt-6">
-                    <button type="button" onclick="window.toggleModal('modal-product')" class="flex-1 bg-gray-100 py-3 rounded-lg font-medium hover:bg-gray-200 transition">Cancelar</button>
-                    <button type="submit" id="btn-save-prod" class="flex-1 bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700 transition flex justify-center items-center gap-2">
-                        Guardar
-                    </button>
-                </div>
-            </form>
+            </div>
+
+            <div class="space-y-2 text-right">
+                <div class="flex justify-between text-sm"><span>Subtotal</span> <span id="inv-subtotal" class="font-medium">$0.00</span></div>
+                <div class="flex justify-between text-sm text-gray-500"><span>Descuento</span> <span id="inv-discount">-$0.00</span></div>
+                <div class="flex justify-between text-xl font-bold text-indigo-900 border-t pt-2 mt-2"><span>Total</span> <span id="inv-total">$0.00</span></div>
+            </div>
+
+            <div class="mt-12 text-center">
+                <p class="font-bold text-gray-800">¡Gracias por su compra!</p>
+                <p class="text-xs text-gray-400 mt-1">Este documento es un comprobante válido.</p>
+            </div>
         </div>
     </div>
 
-    <!-- JAVASCRIPT LÓGICA COMPLETA -->
+    <style>
+        .input-field { width: 100%; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 0.75rem 1rem; outline: none; transition: all; background: #f9fafb; }
+        .input-field:focus { border-color: #6366f1; background: white; box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
+        .label-input { display: block; font-size: 0.75rem; font-weight: 700; color: #4b5563; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    </style>
+
+    <!-- LOGIC -->
     <script type="module">
-        // ----------------------------------------------------
-        // 1. CONFIGURACIÓN FIREBASE Y LIBRERÍAS
-        // ----------------------------------------------------
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { 
-            getDatabase, ref, onValue, push, set, remove, get, child, runTransaction, off 
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
-        import { 
-            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut 
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getDatabase, ref, onValue, push, set, remove, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
 
+        // CONFIG (Reutilizando la del usuario)
         const firebaseConfig = {
             apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
             authDomain: "posdeventas-a03ca.firebaseapp.com",
@@ -343,517 +385,451 @@
         const db = getDatabase(app);
         const auth = getAuth(app);
 
-        // ----------------------------------------------------
-        // 2. ESTADO GLOBAL
-        // ----------------------------------------------------
+        // STATE
+        let currentUser = null;
         let products = [];
         let cart = [];
-        let currentOrder = null;
-        let currentUser = null;
-        
-        // Referencias a listeners para poder apagarlos al salir
-        let productsListener = null;
-        let ordersListener = null;
+        let activeView = 'pos'; // pos, cart, inventory, orders
 
-        // Elementos UI
+        // DOM ELEMENTS
+        const views = {
+            pos: document.getElementById('view-pos'),
+            cart: document.getElementById('view-cart'),
+            inventory: document.getElementById('view-inventory'),
+            orders: document.getElementById('view-orders')
+        };
         const authScreen = document.getElementById('auth-screen');
         const appScreen = document.getElementById('app-screen');
-        const loadingScreen = document.getElementById('loading-screen');
-        
-        const grid = document.getElementById('product-grid');
-        const cartContainer = document.getElementById('cart-items');
-        const cartTotalEl = document.getElementById('cart-total');
-        const cartCountEl = document.getElementById('cart-count');
-        
-        const productForm = document.getElementById('product-form');
-        const loginForm = document.getElementById('login-form');
-        const registerForm = document.getElementById('register-form');
 
-        // ----------------------------------------------------
-        // 3. INICIALIZACIÓN Y AUTH
-        // ----------------------------------------------------
+        // --- INIT ---
         window.addEventListener('load', () => {
-            if(window.lucide) window.lucide.createIcons();
-            // Revisar URL por si es una factura compartida
-            checkUrlForInvoice();
-        });
-
-        // Manejador de Autenticación Principal
-        onAuthStateChanged(auth, (user) => {
-            loadingScreen.classList.add('hidden'); // Ocultar loader inicial
-            
-            if (user) {
-                console.log("Usuario autenticado:", user.email);
-                currentUser = user;
-                authScreen.classList.add('hidden');
-                
-                // Solo mostrar App si NO estamos en modo "Ver Factura pública"
-                const urlParams = new URLSearchParams(window.location.search);
-                if(!urlParams.get('orderId')) {
+            lucide.createIcons();
+            // Auth Listener
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    authScreen.classList.add('hidden');
                     appScreen.classList.remove('hidden');
-                    startAppListeners(); // IMPORTANTE: Iniciar listeners aquí
+                    appScreen.classList.add('flex');
+                    document.getElementById('user-email-display').innerText = user.email;
+                    initDataListeners();
+                } else {
+                    currentUser = null;
+                    authScreen.classList.remove('hidden');
+                    appScreen.classList.add('hidden');
+                    appScreen.classList.remove('flex');
                 }
-            } else {
-                console.log("No hay usuario. Mostrando login.");
-                currentUser = null;
-                authScreen.classList.remove('hidden');
-                appScreen.classList.add('hidden');
-                stopAppListeners();
-            }
+            });
         });
 
-        function checkUrlForInvoice() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const orderId = urlParams.get('orderId');
-            if (orderId) {
-                // Modo Vista Factura
-                appScreen.classList.add('hidden');
-                window.loadInvoiceData(orderId);
-            }
-        }
-
-        // ----------------------------------------------------
-        // 4. LISTENERS DE BASE DE DATOS (Protegidos)
-        // ----------------------------------------------------
-        function startAppListeners() {
-            // Referencia Productos
-            const pRef = ref(db, 'products');
-            onValue(pRef, (snapshot) => {
-                const data = snapshot.val();
-                products = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
-                renderProducts();
-                renderInventory();
-            }, (error) => {
-                console.error("Error cargando productos:", error);
-                // No mostrar alerta molesta, solo log
-            });
-
-            // Referencia Ordenes
-            const oRef = ref(db, 'orders');
-            onValue(oRef, (snapshot) => {
-                const data = snapshot.val();
-                const orders = data ? Object.keys(data).map(key => ({id: key, ...data[key]})).reverse() : [];
-                renderOrdersHistory(orders);
-            });
-        }
-
-        function stopAppListeners() {
-            // Apagar listeners para evitar errores de permisos al hacer logout
-            const pRef = ref(db, 'products');
-            const oRef = ref(db, 'orders');
-            off(pRef);
-            off(oRef);
-            products = [];
-        }
-
-        // ----------------------------------------------------
-        // 5. RENDERIZADO UI
-        // ----------------------------------------------------
-        
-        // Renderizar Catálogo POS
-        function renderProducts() {
-            const search = document.getElementById('search-input').value.toLowerCase();
-            const filtered = products.filter(p => p.name.toLowerCase().includes(search));
+        // --- NAVIGATION ---
+        window.navTo = (viewName) => {
+            activeView = viewName;
             
-            if(filtered.length === 0) {
-                grid.innerHTML = '<div class="col-span-full text-center text-gray-400 py-10">No se encontraron productos o inventario vacío.</div>';
-                return;
+            // Ocultar todas las vistas
+            Object.values(views).forEach(el => el.classList.add('hidden'));
+            
+            // Mostrar vista activa
+            views[viewName].classList.remove('hidden');
+            
+            // Actualizar Nav Styles (Mobile & Desktop)
+            updateNavStyles(viewName);
+        };
+
+        function updateNavStyles(active) {
+            // Reset Mobile
+            ['pos', 'cart', 'inventory', 'orders'].forEach(v => {
+                const btn = document.getElementById(`m-nav-${v}`);
+                if(btn) {
+                    btn.classList.remove('text-indigo-600');
+                    btn.classList.add('text-gray-400');
+                }
+                // Desktop
+                const dBtn = document.getElementById(`d-nav-${v}`);
+                if(dBtn) {
+                    dBtn.classList.remove('bg-indigo-50', 'text-indigo-600');
+                    dBtn.classList.add('text-gray-600');
+                }
+            });
+
+            // Set Active Mobile
+            const activeBtn = document.getElementById(`m-nav-${active}`);
+            if(activeBtn) {
+                activeBtn.classList.add('text-indigo-600');
+                activeBtn.classList.remove('text-gray-400');
             }
 
-            grid.innerHTML = filtered.map(p => `
-                <div class="bg-white rounded-xl shadow-sm hover:shadow-lg transition cursor-pointer border overflow-hidden group ${p.stock < 1 ? 'opacity-60 grayscale' : ''}" 
-                     onclick="window.addToCart('${p.id}')">
-                    <div class="h-40 bg-gray-100 flex items-center justify-center relative overflow-hidden">
-                        ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">` 
-                                     : '<i data-lucide="image" class="text-gray-300 w-12 h-12"></i>'}
-                        ${p.stock < 1 ? '<div class="absolute inset-0 bg-black/50 flex items-center justify-center text-white font-bold uppercase tracking-widest">Agotado</div>' : ''}
+            // Set Active Desktop
+            const dActiveBtn = document.getElementById(`d-nav-${active}`);
+            if(dActiveBtn) {
+                dActiveBtn.classList.add('bg-indigo-50', 'text-indigo-600');
+                dActiveBtn.classList.remove('text-gray-600');
+            }
+        }
+
+        // --- DATA LISTENERS ---
+        function initDataListeners() {
+            // Products
+            onValue(ref(db, 'products'), (snapshot) => {
+                const data = snapshot.val();
+                products = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+                renderPOS();
+                renderInventory();
+            });
+            // Orders
+            onValue(ref(db, 'orders'), (snapshot) => {
+                const data = snapshot.val();
+                const orders = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })).reverse() : [];
+                renderOrders(orders);
+            });
+        }
+
+        // --- RENDERERS ---
+
+        // 1. POS GRID
+        function renderPOS() {
+            const container = document.getElementById('pos-grid');
+            const search = document.getElementById('search-pos').value.toLowerCase();
+            
+            const filtered = products.filter(p => 
+                p.name.toLowerCase().includes(search) || 
+                (p.brand && p.brand.toLowerCase().includes(search))
+            );
+
+            container.innerHTML = filtered.map(p => `
+                <div onclick="addToCart('${p.id}')" class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden active:scale-95 transition flex flex-col h-full relative">
+                    <div class="h-28 bg-gray-100 flex items-center justify-center relative">
+                        ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover">` : `<i data-lucide="image" class="text-gray-300 w-8 h-8"></i>`}
+                        ${p.stock <= 0 ? '<div class="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-bold uppercase">Agotado</div>' : ''}
+                        ${p.stock > 0 && p.stock < 5 ? '<div class="absolute top-1 right-1 bg-orange-500 text-white text-[10px] px-1.5 rounded font-bold">¡Poco!</div>' : ''}
                     </div>
-                    <div class="p-4">
-                        <h3 class="font-bold text-gray-800 text-sm truncate mb-1" title="${p.name}">${p.name}</h3>
-                        <p class="text-xs text-gray-500 mb-2">${p.category || 'General'}</p>
-                        <div class="flex justify-between items-center">
-                            <span class="text-indigo-600 font-extrabold text-lg">$${parseFloat(p.price).toFixed(2)}</span>
-                            <span class="text-xs font-medium px-2 py-1 rounded bg-gray-100 ${p.stock < 5 ? 'text-red-600 bg-red-50' : 'text-gray-600'}">
-                                Stock: ${p.stock}
-                            </span>
+                    <div class="p-3 flex flex-col flex-1">
+                        <div class="text-[10px] text-gray-400 font-bold uppercase mb-0.5">${p.brand || 'Genérico'}</div>
+                        <h3 class="text-xs font-bold text-gray-800 leading-tight mb-1 line-clamp-2">${p.name}</h3>
+                        ${p.color ? `<p class="text-[10px] text-gray-500 mb-2">Color: ${p.color}</p>` : ''}
+                        <div class="mt-auto flex justify-between items-center">
+                            <span class="text-indigo-600 font-bold">$${parseFloat(p.price).toFixed(2)}</span>
+                            <div class="bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center text-indigo-600 shadow-sm"><i data-lucide="plus" class="w-3 h-3"></i></div>
                         </div>
                     </div>
                 </div>
             `).join('');
-            if(window.lucide) window.lucide.createIcons();
+            lucide.createIcons();
         }
 
-        // Renderizar Tabla Inventario
+        document.getElementById('search-pos').addEventListener('input', renderPOS);
+
+        // 2. INVENTORY LIST (Cards for Mobile)
         function renderInventory() {
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = products.map(p => `
-                <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                    <td class="p-4 font-medium text-gray-800">${p.name}</td>
-                    <td class="p-4 text-sm text-gray-500">${p.category || '-'}</td>
-                    <td class="p-4 text-right text-gray-400 text-sm font-mono">$${parseFloat(p.cost).toFixed(2)}</td>
-                    <td class="p-4 text-right font-bold text-gray-700 font-mono">$${parseFloat(p.price).toFixed(2)}</td>
-                    <td class="p-4 text-center">
-                        <span class="px-2 py-1 rounded text-xs font-bold ${p.stock < 5 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}">
-                            ${p.stock}
-                        </span>
-                    </td>
-                    <td class="p-4 text-right">
-                        <button onclick="window.deleteProduct('${p.id}')" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded transition" title="Eliminar">
-                           <i data-lucide="trash-2" class="w-4 h-4"></i>
-                        </button>
-                    </td>
-                </tr>
-            `).join('');
-            if(window.lucide) window.lucide.createIcons();
-        }
-
-        // Renderizar Historial
-        function renderOrdersHistory(orders) {
-            const tbody = document.getElementById('orders-table-body');
-            tbody.innerHTML = orders.map(o => `
-                <tr class="hover:bg-gray-50 transition border-b border-gray-100 last:border-0">
-                    <td class="p-4 text-xs font-mono text-gray-400">...${o.id.slice(-6)}</td>
-                    <td class="p-4 text-sm text-gray-600">${o.dateString}</td>
-                    <td class="p-4 font-medium text-gray-800 text-sm">${o.customer || 'Consumidor Final'}</td>
-                    <td class="p-4 text-right font-bold text-indigo-600 font-mono">$${parseFloat(o.total).toFixed(2)}</td>
-                    <td class="p-4 text-center">
-                        <button onclick="window.showInvoice('${o.id}')" class="text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded text-sm font-bold transition">Ver</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        // Búsqueda
-        document.getElementById('search-input').addEventListener('input', renderProducts);
-
-        // ----------------------------------------------------
-        // 6. LÓGICA CARRITO Y VENTAS
-        // ----------------------------------------------------
-        
-        window.addToCart = (id) => {
-            const prod = products.find(p => p.id === id);
-            if (!prod || prod.stock < 1) return alert("Producto sin stock disponible.");
-            
-            const existing = cart.find(item => item.id === id);
-            
-            // Verificar stock en carrito vs real
-            const currentQtyInCart = existing ? existing.qty : 0;
-            if (currentQtyInCart + 1 > prod.stock) {
-                return alert(`Stock máximo alcanzado (${prod.stock}).`);
-            }
-
-            if (existing) {
-                existing.qty++;
-            } else {
-                cart.push({ ...prod, qty: 1 });
-            }
-            renderCart();
-        };
-
-        window.removeFromCart = (index) => {
-            cart.splice(index, 1);
-            renderCart();
-        };
-
-        function renderCart() {
-            if (cart.length === 0) {
-                cartContainer.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-gray-300">
-                        <i data-lucide="shopping-cart" class="w-12 h-12 mb-2 opacity-50"></i>
-                        <p class="text-sm">Carrito vacío</p>
-                    </div>`;
-                cartTotalEl.innerText = "$0.00";
-                cartCountEl.innerText = "0";
-                if(window.lucide) window.lucide.createIcons();
-                return;
-            }
-
-            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-            const disc = parseFloat(document.getElementById('discount-input').value) || 0;
-            const del = parseFloat(document.getElementById('delivery-input').value) || 0;
-            const total = Math.max(0, subtotal - disc + del);
-
-            cartTotalEl.innerText = `$${total.toFixed(2)}`;
-            cartCountEl.innerText = cart.reduce((acc, item) => acc + item.qty, 0);
-
-            cartContainer.innerHTML = cart.map((item, index) => `
-                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100 group">
-                    <div class="overflow-hidden">
-                        <p class="font-bold text-sm text-gray-800 truncate pr-2">${item.name}</p>
-                        <p class="text-xs text-indigo-600 font-mono">$${item.price} x ${item.qty} = <strong>$${(item.price * item.qty).toFixed(2)}</strong></p>
+            const container = document.getElementById('inventory-list');
+            container.innerHTML = products.map(p => `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden shrink-0">
+                            ${p.imageUrl ? `<img src="${p.imageUrl}" class="w-full h-full object-cover">` : `<span class="text-xs font-bold text-gray-400">${(p.name[0] || '?').toUpperCase()}</span>`}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm text-gray-800">${p.name}</h3>
+                            <p class="text-xs text-gray-500">${p.brand || ''} • ${p.category || 'General'}</p>
+                            <div class="text-xs mt-1">
+                                <span class="text-gray-400">Costo: $${p.cost}</span>
+                                <span class="ml-2 font-bold text-green-600">Venta: $${p.price}</span>
+                            </div>
+                        </div>
                     </div>
-                    <button onclick="window.removeFromCart(${index})" class="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition">
-                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
+                    <div class="flex flex-col items-end gap-2">
+                        <div class="text-sm font-bold ${p.stock < 5 ? 'text-red-500' : 'text-gray-700'}">
+                            Stock: ${p.stock}
+                        </div>
+                        <button onclick="editProduct('${p.id}')" class="text-indigo-600 text-xs font-bold bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100">Editar</button>
+                    </div>
                 </div>
             `).join('');
-            if(window.lucide) window.lucide.createIcons();
         }
 
-        // Listeners para recalcular totales
-        document.getElementById('discount-input').addEventListener('input', renderCart);
-        document.getElementById('delivery-input').addEventListener('input', renderCart);
+        // 3. CART & LOGIC
+        window.addToCart = (id) => {
+            const prod = products.find(p => p.id === id);
+            if(!prod || prod.stock <= 0) return alert("Sin stock disponible");
+            
+            const existing = cart.find(c => c.id === id);
+            if(existing) {
+                if(existing.qty >= prod.stock) return alert("Stock máximo alcanzado");
+                existing.qty++;
+            } else {
+                cart.push({...prod, qty: 1});
+            }
+            renderCart();
+            // Feedback visual simple
+            const btn = document.getElementById('m-nav-cart');
+            btn.classList.add('scale-110');
+            setTimeout(() => btn.classList.remove('scale-110'), 200);
+        };
 
-        // COBRAR Y GUARDAR VENTA
-        window.processCheckout = async () => {
-            if (cart.length === 0) return alert("El carrito está vacío.");
-            if (!confirm("¿Confirmar y procesar venta?")) return;
+        window.removeFromCart = (idx) => {
+            cart.splice(idx, 1);
+            renderCart();
+        };
 
-            const btn = document.getElementById('btn-checkout');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = '<div class="loader w-5 h-5 border-2 border-white/50 border-t-white"></div> Procesando...';
-            btn.disabled = true;
+        window.clearCart = () => {
+            cart = [];
+            renderCart();
+        }
 
-            const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-            const discount = parseFloat(document.getElementById('discount-input').value) || 0;
-            const delivery = parseFloat(document.getElementById('delivery-input').value) || 0;
-            const total = subtotal - discount + delivery;
-            const totalCost = cart.reduce((acc, item) => acc + (item.cost * item.qty), 0);
-            const customer = document.getElementById('customer-name').value || 'Consumidor Final';
+        function renderCart() {
+            // Cálculos
+            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            
+            // Render Mobile List
+            const mobileContainer = document.getElementById('cart-items-mobile');
+            const desktopContainer = document.getElementById('cart-items-desktop');
+            
+            const html = cart.map((item, idx) => `
+                <div class="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div class="flex items-center gap-3">
+                         <div class="w-10 h-10 bg-white rounded border flex items-center justify-center text-xs font-bold text-gray-400">
+                            ${item.qty}x
+                         </div>
+                         <div>
+                            <p class="font-bold text-sm text-gray-800 line-clamp-1 w-40">${item.name}</p>
+                            <p class="text-xs text-indigo-600">$${(item.price * item.qty).toFixed(2)}</p>
+                         </div>
+                    </div>
+                    <button onclick="removeFromCart(${idx})" class="text-red-400 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `).join('');
 
-            const newOrder = {
-                items: cart,
-                subtotal, discount, delivery, total, totalCost, customer,
-                sellerId: currentUser.uid,
-                sellerEmail: currentUser.email,
+            if(cart.length === 0) {
+                 mobileContainer.innerHTML = desktopContainer.innerHTML = `
+                    <div class="flex flex-col items-center justify-center py-10 text-gray-400">
+                        <i data-lucide="shopping-cart" class="w-10 h-10 mb-2 opacity-30"></i>
+                        <p class="text-sm">Vacío</p>
+                    </div>`;
+            } else {
+                mobileContainer.innerHTML = html;
+                desktopContainer.innerHTML = html;
+            }
+
+            // Totales Mobile
+            document.getElementById('m-subtotal').innerText = `$${subtotal.toFixed(2)}`;
+            const mDisc = parseFloat(document.getElementById('m-discount').value) || 0;
+            document.getElementById('m-total').innerText = `$${Math.max(0, subtotal - mDisc).toFixed(2)}`;
+
+            // Totales Desktop & Badges
+            document.getElementById('badge-nav').innerText = cart.length;
+            document.getElementById('badge-nav').classList.toggle('hidden', cart.length === 0);
+            document.getElementById('badge-cart-mobile').innerText = cart.length;
+            document.getElementById('badge-cart-mobile').classList.toggle('hidden', cart.length === 0);
+
+            // Resumen Desktop
+            document.getElementById('cart-summary-desktop').innerHTML = `
+                <div class="flex justify-between text-sm"><span>Subtotal:</span> <span>$${subtotal.toFixed(2)}</span></div>
+                <div class="flex justify-between items-center text-sm my-2">
+                    <span>Descuento:</span> 
+                    <input type="number" id="d-discount" class="w-16 border rounded text-right p-1" placeholder="0" oninput="renderCart()">
+                </div>
+                <div class="flex justify-between font-bold text-xl pt-2 border-t">
+                    <span>Total:</span> 
+                    <span>$${Math.max(0, subtotal - (parseFloat(document.getElementById('d-discount')?.value) || 0)).toFixed(2)}</span>
+                </div>
+            `;
+            
+            lucide.createIcons();
+        }
+
+        // Listeners descuento mobile
+        document.getElementById('m-discount').addEventListener('input', renderCart);
+
+        // --- SALES PROCESS ---
+        window.processSale = async () => {
+            if(cart.length === 0) return alert("Carrito vacío");
+            
+            const subtotal = cart.reduce((acc, i) => acc + (i.price * i.qty), 0);
+            // Detectar si estamos en móvil o desktop para el input de descuento correcto
+            const discInput = document.querySelector('#view-cart:not(.hidden) #m-discount') || document.querySelector('#d-discount');
+            const discount = parseFloat(discInput?.value) || 0;
+            const total = Math.max(0, subtotal - discount);
+
+            if(!confirm(`¿Cobrar $${total.toFixed(2)}?`)) return;
+
+            const order = {
                 date: new Date().toISOString(),
-                dateString: new Date().toLocaleString()
+                items: cart,
+                subtotal, discount, total,
+                seller: currentUser.email
             };
 
             try {
-                // 1. Descontar Stock con Transacción (Atómica)
-                // Si falla uno, fallan todos idealmente, pero aquí hacemos loop.
-                // En producción real, usaríamos una sola actualización multipath si fuera posible,
-                // pero runTransaction por item es seguro para stock individual.
+                // Stock Updates
                 const updates = cart.map(item => {
-                    const stockRef = ref(db, `products/${item.id}/stock`);
-                    return runTransaction(stockRef, (currentStock) => {
-                        if (currentStock === null) return 0; // Si no existe
-                        if (currentStock < item.qty) throw new Error(`Stock insuficiente para ${item.name}`);
-                        return currentStock - item.qty;
+                    return runTransaction(ref(db, `products/${item.id}/stock`), (current) => {
+                        return (current || 0) - item.qty;
                     });
                 });
-
                 await Promise.all(updates);
-
-                // 2. Crear Orden
-                const newRef = await push(ref(db, 'orders'), newOrder);
                 
-                // 3. Limpiar
+                // Save Order
+                const newOrderRef = await push(ref(db, 'orders'), order);
+                
+                // Reset
                 cart = [];
-                document.getElementById('customer-name').value = '';
-                document.getElementById('discount-input').value = '';
-                document.getElementById('delivery-input').value = '';
+                if(discInput) discInput.value = '';
                 renderCart();
-                
-                // 4. Mostrar Factura
-                window.showInvoice(newRef.key);
+                navTo('pos'); // Volver al inicio
+                showInvoiceModal({id: newOrderRef.key, ...order});
 
-            } catch (error) {
-                console.error("Error en venta:", error);
-                alert("Error procesando la venta: " + error.message);
-                // Aquí podrías implementar rollback si es crítico
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+            } catch(e) {
+                alert("Error: " + e.message);
             }
         };
 
-        // ----------------------------------------------------
-        // 7. GESTIÓN DE PRODUCTOS
-        // ----------------------------------------------------
-        
-        productForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('btn-save-prod');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = 'Guardando...';
-            btn.disabled = true;
+        // --- PRODUCT MANAGEMENT ---
+        const modalProd = document.getElementById('modal-product');
+        const formProd = document.getElementById('product-form');
 
-            const formData = new FormData(e.target);
+        window.openProductModal = () => {
+            formProd.reset();
+            document.getElementById('prod-id').value = '';
+            document.getElementById('modal-title').innerText = "Nuevo Producto";
+            modalProd.classList.remove('hidden');
+        };
+
+        window.closeProductModal = () => {
+            modalProd.classList.add('hidden');
+        };
+
+        window.editProduct = (id) => {
+            const p = products.find(x => x.id === id);
+            if(!p) return;
+            
+            // Populate Form
+            Object.keys(p).forEach(key => {
+                const input = formProd.elements[key];
+                if(input) input.value = p[key];
+            });
+            document.getElementById('prod-id').value = id; // Asegurar ID
+            document.getElementById('modal-title').innerText = "Editar Producto";
+            modalProd.classList.remove('hidden');
+        };
+
+        window.submitProduct = async () => {
+            const formData = new FormData(formProd);
             const data = Object.fromEntries(formData.entries());
             
-            // Conversiones Numéricas Seguras
-            data.price = parseFloat(data.price) || 0;
-            data.cost = parseFloat(data.cost) || 0;
-            data.stock = parseInt(data.stock) || 0;
+            // Validaciones
+            if(!data.name || !data.price || !data.stock) return alert("Nombre, Precio y Stock son obligatorios");
 
-            if(!currentUser) {
-                alert("Debes iniciar sesión para guardar productos.");
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                return;
-            }
+            // Conversiones de tipos
+            data.price = parseFloat(data.price);
+            data.cost = parseFloat(data.cost);
+            data.stock = parseInt(data.stock);
+            if(data.minStock) data.minStock = parseInt(data.minStock);
+
+            const id = data.id;
+            delete data.id; // No guardar ID dentro del objeto data en DB
 
             try {
-                // Usamos push() para generar ID único automáticamente
-                await push(ref(db, 'products'), data);
-                
-                window.toggleModal('modal-product');
-                productForm.reset();
-                alert("¡Producto guardado correctamente!");
-            } catch (error) {
-                console.error("Error guardando producto:", error);
-                alert("Error al guardar: Verifique su conexión o permisos.\n" + error.message);
-            } finally {
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-            }
-        });
-
-        window.deleteProduct = async (id) => {
-            if(!confirm("¿Está seguro de eliminar este producto? Esta acción no se puede deshacer.")) return;
-            try {
-                await remove(ref(db, `products/${id}`));
-                // No hace falta alert, se actualiza la UI sola por el listener
-            } catch (error) {
-                alert("Error eliminando: " + error.message);
+                if(id) {
+                    // Update
+                    await set(ref(db, `products/${id}`), data);
+                } else {
+                    // Create
+                    await push(ref(db, 'products'), data);
+                }
+                closeProductModal();
+                alert("Producto Guardado");
+            } catch(e) {
+                alert("Error guardando: " + e.message);
             }
         };
 
-        // ----------------------------------------------------
-        // 8. AUTENTICACIÓN
-        // ----------------------------------------------------
-        loginForm.addEventListener('submit', (e) => {
+        // --- ORDERS & INVOICE ---
+        function renderOrders(list) {
+            const container = document.getElementById('orders-list');
+            container.innerHTML = list.map(o => `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center">
+                    <div>
+                        <div class="text-[10px] text-gray-400 font-mono">#${o.id.slice(-6)}</div>
+                        <div class="font-bold text-sm">${new Date(o.date).toLocaleDateString()} ${new Date(o.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                        <div class="text-xs text-gray-500">${o.items.length} items</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-bold text-indigo-600">$${parseFloat(o.total).toFixed(2)}</div>
+                        <button onclick='window.viewInvoiceData("${o.id}")' class="text-xs text-gray-400 underline mt-1">Ver Ticket</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        window.viewInvoiceData = (id) => {
+             // Buscar en lista local (optimización) o hacer fetch si fuera necesario
+             // Como ya tenemos orders en memoria por el listener:
+             // (Nota: la lista orders dentro de renderOrders viene del snapshot, necesito acceso a ella.
+             //  Lo ideal es buscar en la variable global products o hacer un get a DB. 
+             //  Aquí haremos un get rápido para asegurar datos frescos).
+             get(ref(db, `orders/${id}`)).then(snap => {
+                 if(snap.exists()) showInvoiceModal({id: snap.key, ...snap.val()});
+             });
+        };
+
+        window.showInvoiceModal = (order) => {
+            document.getElementById('inv-id').innerText = `#${order.id}`;
+            document.getElementById('inv-date').innerText = new Date(order.date).toLocaleString();
+            
+            document.getElementById('inv-items').innerHTML = order.items.map(i => `
+                <div class="flex justify-between">
+                    <span>${i.qty} x ${i.name}</span>
+                    <span>$${(i.price * i.qty).toFixed(2)}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('inv-subtotal').innerText = `$${order.subtotal.toFixed(2)}`;
+            document.getElementById('inv-discount').innerText = `-$${(order.discount || 0).toFixed(2)}`;
+            document.getElementById('inv-total').innerText = `$${order.total.toFixed(2)}`;
+
+            document.getElementById('invoice-view').classList.remove('hidden');
+        };
+
+        window.closeInvoice = () => document.getElementById('invoice-view').classList.add('hidden');
+
+        // --- AUTH UI ---
+        const loginForm = document.getElementById('login-form');
+        let isLoginMode = true;
+
+        loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
             const pass = document.getElementById('login-pass').value;
-            const btn = document.getElementById('btn-login-submit');
-            
-            btn.innerHTML = '<div class="loader w-4 h-4 border-2 border-white/50 border-t-white"></div>';
-            
-            signInWithEmailAndPassword(auth, email, pass)
-                .then(() => {
-                    loginForm.reset();
-                    // Auth state change manejará la UI
-                })
-                .catch((error) => {
-                    alert("Error de inicio de sesión: " + error.message);
-                })
-                .finally(() => {
-                    btn.innerHTML = 'Entrar';
-                });
-        });
+            const btn = document.getElementById('btn-login');
 
-        registerForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const email = document.getElementById('reg-email').value;
-            const pass = document.getElementById('reg-pass').value;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader mx-auto border-white border-t-transparent"></div>';
 
-            createUserWithEmailAndPassword(auth, email, pass)
-                .then(() => {
-                    alert("Usuario creado exitosamente. Ingresando...");
-                    registerForm.reset();
-                })
-                .catch((error) => alert("Error registro: " + error.message));
-        });
-
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            if(confirm("¿Cerrar sesión?")) signOut(auth);
-        });
-
-        // Alternar formularios
-        document.getElementById('show-register-btn').addEventListener('click', () => {
-            document.getElementById('login-form').classList.add('hidden');
-            registerForm.classList.remove('hidden');
-        });
-        document.getElementById('cancel-reg-btn').addEventListener('click', () => {
-            registerForm.classList.add('hidden');
-            document.getElementById('login-form').classList.remove('hidden');
-        });
-
-        // ----------------------------------------------------
-        // 9. FUNCIONES UI GLOBALES
-        // ----------------------------------------------------
-        window.switchView = (viewName) => {
-            ['pos', 'inventory', 'orders'].forEach(v => {
-                document.getElementById(`view-${v}`).classList.add('hidden');
-                document.getElementById(`nav-${v}`).classList.remove('bg-indigo-600', 'text-white');
-            });
-            document.getElementById(`view-${viewName}`).classList.remove('hidden');
-            document.getElementById(`nav-${viewName}`).classList.add('bg-indigo-600', 'text-white');
-        };
-
-        window.toggleModal = (id) => {
-            const el = document.getElementById(id);
-            if(el) el.classList.toggle('hidden');
-        };
-
-        // Lógica Factura
-        window.loadInvoiceData = async (orderId) => {
             try {
-                const snapshot = await get(child(ref(db), `orders/${orderId}`));
-                if (snapshot.exists()) {
-                    currentOrder = { id: snapshot.key, ...snapshot.val() };
-                    renderInvoiceOverlay();
+                if(isLoginMode) {
+                    await signInWithEmailAndPassword(auth, email, pass);
                 } else {
-                    alert("Orden no encontrada");
+                    await createUserWithEmailAndPassword(auth, email, pass);
                 }
-            } catch (error) {
-                console.error(error);
-                alert("Error cargando factura");
+            } catch(e) {
+                alert("Error: " + e.message);
+                btn.disabled = false;
+                btn.innerText = isLoginMode ? "Iniciar Sesión" : "Registrarse";
             }
-        };
+        });
 
-        window.showInvoice = (orderId) => {
-            loadInvoiceData(orderId);
-        };
+        document.getElementById('toggle-auth').addEventListener('click', (e) => {
+            isLoginMode = !isLoginMode;
+            e.target.innerText = isLoginMode ? "¿No tienes cuenta? Regístrate" : "¿Ya tienes cuenta? Inicia Sesión";
+            document.getElementById('btn-login').innerText = isLoginMode ? "Iniciar Sesión" : "Registrarse";
+        });
 
-        function renderInvoiceOverlay() {
-            if(!currentOrder) return;
-            
-            document.getElementById('inv-id').innerText = `ORDEN #${currentOrder.id.slice(-8).toUpperCase()}`;
-            document.getElementById('inv-customer').innerText = currentOrder.customer;
-            document.getElementById('inv-date').innerText = currentOrder.dateString;
-            
-            document.getElementById('inv-items').innerHTML = currentOrder.items.map(item => `
-                <tr class="border-b border-gray-100 last:border-0">
-                    <td class="py-3 pl-2">${item.name}</td>
-                    <td class="py-3 text-center">${item.qty}</td>
-                    <td class="py-3 text-right">$${parseFloat(item.price).toFixed(2)}</td>
-                    <td class="py-3 text-right pr-2 font-medium">$${(item.price * item.qty).toFixed(2)}</td>
-                </tr>
-            `).join('');
-
-            document.getElementById('inv-subtotal').innerText = `$${currentOrder.subtotal.toFixed(2)}`;
-            document.getElementById('inv-total').innerText = `$${currentOrder.total.toFixed(2)}`;
-
-            const discRow = document.getElementById('inv-row-disc');
-            if(currentOrder.discount > 0) {
-                discRow.classList.remove('hidden');
-                document.getElementById('inv-disc').innerText = `-$${currentOrder.discount.toFixed(2)}`;
-            } else {
-                discRow.classList.add('hidden');
-            }
-
-            const delRow = document.getElementById('inv-row-del');
-            if(currentOrder.delivery > 0) {
-                delRow.classList.remove('hidden');
-                document.getElementById('inv-del').innerText = `+$${currentOrder.delivery.toFixed(2)}`;
-            } else {
-                delRow.classList.add('hidden');
-            }
-
-            document.getElementById('invoice-view').classList.remove('hidden');
-        }
-
-        window.closeInvoice = () => {
-            document.getElementById('invoice-view').classList.add('hidden');
-            const urlParams = new URLSearchParams(window.location.search);
-            if(urlParams.get('orderId')) {
-                // Limpiar URL si estábamos en modo solo ver
-                window.location.href = window.location.pathname;
-            }
-        };
-
-        window.copyInvoiceLink = () => {
-            if(!currentOrder) return;
-            const url = `${window.location.origin}${window.location.pathname}?orderId=${currentOrder.id}`;
-            navigator.clipboard.writeText(url);
-            alert("Enlace copiado al portapapeles:\n" + url);
-        };
+        document.getElementById('btn-logout').addEventListener('click', () => {
+            if(confirm("¿Salir?")) signOut(auth);
+        });
 
     </script>
 </body>
 </html>
+
 
