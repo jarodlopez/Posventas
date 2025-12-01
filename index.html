@@ -1,1137 +1,575 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POS Pro Mobile</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        
-        /* Scrollbar oculta para experiencia app nativa */
-        ::-webkit-scrollbar { width: 0px; background: transparent; }
-        
-        /* Animaciones */
-        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        /* Badges */
-        .status-badge { padding: 4px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
-        .st-pending { background: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
-        .st-paid { background: #f0fdf4; color: #15803d; border: 1px solid #dcfce7; }
-        .st-process { background: #eff6ff; color: #1d4ed8; border: 1px solid #dbeafe; }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Homemart PRO - Punto de Venta</title>
+  <meta name="description" content="Sistema POS profesional para Homemart - Ferretería y Hogar"/>
 
-        /* Mobile Modals */
-        @media (max-width: 768px) {
-            .mobile-full-modal {
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                border-radius: 0; max-width: none !important; max-height: none !important;
-                display: flex; flex-direction: column;
-            }
-            .mobile-modal-content { flex: 1; overflow-y: auto; }
-        }
-        
-        /* Bottom Nav Safe Area */
-        .pb-safe-nav { padding-bottom: 80px; } 
+  <!-- Tailwind + FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-        @media print {
-            body * { visibility: hidden; }
-            #invoice-view, #invoice-view * { visibility: visible; }
-            #invoice-view { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; padding: 0; margin: 0; }
-            .no-print { display: none !important; }
-        }
-    </style>
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- ESC/POS for thermal printers (new) -->
+  <script src="https://unpkg.com/escpos-web@1.0.2/dist/escpos.min.js"></script>
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.2); }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans h-[100dvh] overflow-hidden flex flex-col">
+<body>
+  <div id="root"></div>
 
-    <!-- Toast -->
-    <div id="toast-container" class="fixed top-4 left-0 w-full flex justify-center z-[100] pointer-events-none px-4"></div>
+  <script type="text/babel" data-type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, getDocs, updateDoc, increment,
+      doc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp,
+      where, getDoc, writeBatch
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    import {
+      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    <!-- PANTALLA DE CARGA -->
-    <div id="loading-screen" class="fixed inset-0 z-[70] bg-white flex flex-col items-center justify-center">
-        <div class="loader w-10 h-10 border-4 border-indigo-600 mb-4"></div>
-        <h2 class="text-gray-600 font-semibold tracking-wide text-sm animate-pulse">CARGANDO SISTEMA...</h2>
-    </div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
+      authDomain: "posdeventas-a03ca.firebaseapp.com",
+      projectId: "posdeventas-a03ca",
+      storageBucket: "posdeventas-a03ca.firebasestorage.app",
+      messagingSenderId: "975141670948",
+      appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
+    };
 
-    <!-- PANTALLA LOGIN/REGISTRO -->
-    <div id="auth-screen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center hidden p-4">
-        <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-sm relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 to-purple-600"></div>
-            <div class="text-center mb-6 mt-2">
-                <div class="bg-indigo-50 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <i data-lucide="store" class="w-7 h-7 text-indigo-600"></i>
-                </div>
-                <h2 class="text-xl font-bold text-gray-800" id="auth-title">Acceso POS</h2>
-                <p class="text-xs text-gray-400">Sistema de Ventas Móvil</p>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ==== COMPONENTES REUTILIZABLES ====
+    const Icon = ({ name, size = 20 }) => {
+      const icons = {
+        cart: "fa-cart-shopping", box: "fa-box", history: "fa-clock-rotate-left",
+        chart: "fa-chart-line", lock: "fa-lock", unlock: "fa-lock-open", plus: "fa-plus",
+        trash: "fa-trash", search: "fa-magnifying-glass", whatsapp: "fa-whatsapp",
+        dollar: "fa-dollar-sign", truck: "fa-truck-fast", user: "fa-user", logout: "fa-right-from-bracket",
+        receipt: "fa-receipt", tag: "fa-tag", print: "fa-print", filter: "fa-filter"
+      };
+      return <i className={`fa-solid \( {icons[name] || 'fa-circle'} text- \){size}px`}></i>;
+    };
+
+    const Button = ({ children, onClick, variant = "primary", icon, disabled, className = "" }) => {
+      const variants = {
+        primary: "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg",
+        success: "bg-green-600 hover:bg-green-700 text-white",
+        danger: "bg-red-600 hover:bg-red-700 text-white",
+        outline: "border-2 border-white/30 hover:bg-white/10 text-white backdrop-blur"
+      };
+      return (
+        <button onClick={onClick} disabled={disabled}
+          className={`px-5 py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all \( {variants[variant]} disabled:opacity-50 \){className}`}>
+          {icon && <Icon name={icon} />}
+          {children}
+        </button>
+      );
+    };
+
+    const Input = ({ label, ...props }) => (
+      <div className="flex flex-col gap-1">
+        {label && <label className="text-sm font-medium text-gray-300">{label}</label>}
+        <input className="px-4 py-3 rounded-xl bg-white/20 backdrop-blur text-white placeholder-white/60 border border-white/30 focus:outline-none focus:ring-2 focus:ring-white" {...props} />
+      </div>
+    );
+
+    // ==== APP PRINCIPAL ====
+    function App() {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [view, setView] = useState('pos');
+      const [products, setProducts] = useState([]);
+      const [sales, setSales] = useState([]);
+      const [shift, setShift] = useState(null);
+      const [customerOrder, setCustomerOrder] = useState(null);
+      const [isCustomerView, setIsCustomerView] = useState(false);
+
+      useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const orderId = params.get('orderId');
+
+        if (orderId) {
+          setIsCustomerView(true);
+          loadCustomerOrder(orderId);
+        } else {
+          const unsubscribe = onAuthStateChanged(auth, async (u) => {
+            setUser(u);
+            if (u) {
+              loadData();
+              checkShift(u.uid);
+            }
+            setLoading(false);
+          });
+          return () => unsubscribe();
+        }
+      }, []);
+
+      const loadCustomerOrder = async (id) => {
+        try {
+          await signInAnonymously(auth);
+          const docSnap = await getDoc(doc(db, "sales", id));
+          if (docSnap.exists()) setCustomerOrder({ id: docSnap.id, ...docSnap.data(), date: docSnap.data().date?.toDate() });
+          else Swal.fire("Error", "Orden no encontrada", "error");
+        } catch (e) { console.error(e); }
+        setLoading(false);
+      };
+
+      const loadData = () => {
+        onSnapshot(collection(db, "products"), s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()}))));
+        onSnapshot(query(collection(db, "sales"), orderBy("date", "desc")), s => setSales(s.docs.map(d => ({id:d.id, ...d.data(), date: d.data().date?.toDate()}))));
+      };
+
+      const checkShift = async (uid) => {
+        const q = query(collection(db, "shifts"), where("status","==","open"), where("userId","==",uid));
+        const snap = await getDocs(q);
+        setShift(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
+      };
+
+      if (loading) return <div className="fixed inset-0 glass flex items-center justify-center text-white text-3xl font-bold">Cargando Homemart PRO...</div>;
+      if (isCustomerView) return <CustomerView order={customerOrder} />;
+      if (!user) return <Login />;
+
+      return (
+        <div className="min-h-screen flex">
+          {/* Sidebar */}
+          <aside className="w-20 lg:w-64 bg-gradient-to-b from-indigo-800 to-purple-900 text-white flex flex-col">
+            <div className="p-6 text-center lg:text-left">
+              <h1 className="text-2xl font-bold">Homemart</h1>
+              <p className="text-xs opacity-80 hidden lg:block">Ferretería • Hogar • Construcción</p>
             </div>
-            
-            <form id="auth-form" class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Email</label>
-                    <input type="email" id="auth-email" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="admin@pos.com" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">Contraseña</label>
-                    <input type="password" id="auth-pass" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition" placeholder="••••••" required>
-                </div>
-                <button type="submit" id="auth-submit-btn" class="w-full bg-indigo-600 active:bg-indigo-800 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-indigo-200 transition transform active:scale-95">INICIAR SESIÓN</button>
-            </form>
-            <p id="auth-error" class="text-red-500 text-xs text-center mt-4 hidden font-bold"></p>
-            <div class="mt-6 text-center border-t pt-4">
-                <button id="auth-toggle-btn" onclick="toggleAuthMode()" class="text-xs font-bold text-indigo-500 active:text-indigo-700 p-2">Crear cuenta nueva</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CONFIGURACIÓN INICIAL -->
-    <div id="modal-setup-user" class="fixed inset-0 z-[60] bg-gray-900/90 flex items-center justify-center hidden p-4">
-        <div class="bg-white p-6 rounded-2xl w-full max-w-xs text-center shadow-xl">
-            <i data-lucide="user-circle-2" class="w-12 h-12 text-indigo-600 mx-auto mb-2"></i>
-            <h3 class="text-lg font-bold mb-1">Bienvenido</h3>
-            <p class="text-xs text-gray-500 mb-4">Ingresa tu nombre para los tickets.</p>
-            <input type="text" id="setup-username" class="w-full bg-gray-50 border p-3 rounded-xl mb-4 text-center font-bold outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Ej. Juan Pérez">
-            <button onclick="saveUsername()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg">Comenzar</button>
-        </div>
-    </div>
-
-    <!-- APP PRINCIPAL (ADMIN) -->
-    <div id="app-screen" class="flex-1 flex flex-col hidden h-full relative">
-        <!-- Header Superior -->
-        <header class="bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center shadow-sm z-20 shrink-0">
-            <div class="flex items-center gap-2">
-                <div class="bg-indigo-600 text-white p-1.5 rounded-lg"><i data-lucide="scan-barcode" class="w-5 h-5"></i></div>
-                <div>
-                    <h1 class="font-bold text-gray-800 text-sm leading-tight">POS System</h1>
-                    <p class="text-[10px] text-gray-400 font-mono truncate max-w-[120px]" id="header-username">...</p>
-                </div>
-            </div>
-            <button onclick="logout()" class="text-gray-400 hover:text-red-500 p-2"><i data-lucide="log-out" class="w-5 h-5"></i></button>
-        </header>
-
-        <!-- Contenido Principal con padding inferior para la nav bar -->
-        <main class="flex-1 overflow-hidden relative bg-gray-50 pb-[60px] md:pb-0">
-            
-            <!-- VISTA: POS (Grid + Buscador) -->
-            <div id="view-pos" class="view-section flex flex-col h-full w-full">
-                <!-- Buscador Fijo -->
-                <div class="p-3 bg-white border-b flex gap-2 shrink-0">
-                    <div class="relative flex-1">
-                        <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
-                        <input id="search-input" type="text" placeholder="Buscar producto..." class="w-full bg-gray-100 border-none pl-9 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-200 outline-none">
-                    </div>
-                    <select id="cat-filter" class="bg-gray-100 border-none rounded-xl text-xs px-2 w-24 text-gray-600 font-bold outline-none"><option value="">Todo</option></select>
-                </div>
-
-                <!-- Grid Scrollable -->
-                <div class="flex-1 overflow-y-auto p-3">
-                    <div id="product-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-20"></div>
-                </div>
-
-                <!-- Floating Action Button: Carrito (Solo Móvil) -->
-                <button onclick="toggleCartSidebar()" class="md:hidden fixed bottom-20 right-4 bg-indigo-600 text-white p-4 rounded-full shadow-xl z-40 active:scale-90 transition-transform">
-                    <i data-lucide="shopping-cart" class="w-6 h-6"></i>
-                    <span id="badge-cart" class="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-white hidden">0</span>
+            <nav className="flex-1 px-4">
+              {[
+                {v:'pos',i:'cart',l:'Venta'},
+                {v:'products',i:'box',l:'Productos'},
+                {v:'history',i:'history',l:'Historial'},
+                {v:'dashboard',i:'chart',l:'Reportes'},
+                {v:'shift',i:'lock',l:'Caja'}
+              ].map(item => (
+                <button key={item.v} onClick={()=>setView(item.v)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl mb-2 transition-all ${view===item.v ? 'bg-white/20 font-bold' : 'hover:bg-white/10'}`}>
+                  <Icon name={item.i} size={24} />
+                  <span className="hidden lg:block">{item.l}</span>
                 </button>
+              ))}
+            </nav>
+            <div className="p-4 border-t border-white/20">
+              <p className="hidden lg:block text-sm opacity-90">{user.email}</p>
+              <button onClick={()=>signOut(auth)} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 text-sm">
+                <Icon name="logout" /> <span className="hidden lg:block">Salir</span>
+              </button>
             </div>
+          </aside>
 
-            <!-- VISTA: INVENTARIO -->
-            <div id="view-inventory" class="view-section hidden w-full h-full flex flex-col">
-                <div class="p-4 bg-white border-b flex justify-between items-center shrink-0">
-                    <h2 class="text-lg font-bold text-gray-800">Inventario</h2>
-                    <button onclick="openProductModal()" class="bg-indigo-600 text-white px-3 py-2 rounded-lg text-xs font-bold shadow active:bg-indigo-700 flex items-center gap-1">
-                        <i data-lucide="plus" class="w-4 h-4"></i> Nuevo
+          {/* Main */}
+          <main className="flex-1 p-6 overflow-y-auto">
+            {view === 'pos' && !shift ? <OpenShift user={user} onOpen={checkShift} /> : (
+              <div className="glass rounded-3xl p-8">
+                {view === 'pos' && <POSModule products={products} shift={shift} user={user} />}
+                {view === 'products' && <Inventory products={products} />}
+                {view === 'history' && <HistoryView sales={sales} />}
+                {view === 'dashboard' && <Dashboard sales={sales} products={products} />}
+                {view === 'shift' && <ShiftControl shift={shift} onUpdate={()=>checkShift(user.uid)} />}
+              </div>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    // ==== VISTA CLIENTE ====
+    const CustomerView = ({ order }) => (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-6">
+        <div className="glass rounded-3xl shadow-2xl max-w-md w-full p-8 text-center text-white">
+          <h1 className="text-4xl font-bold mb-2">Homemart</h1>
+          <p className="text-white/80 mb-8">Detalle de tu orden</p>
+          <p className="text-5xl font-bold mb-6">${order?.total.toFixed(2)}</p>
+          <div className="space-y-4 text-left">
+            {order?.items.map((i, idx) => (
+              <div key={idx} className="flex justify-between border-b border-white/20 pb-2">
+                <span>{i.qty}x {i.name} {i.variantName ? `(${i.variantName})` : ''}</span>
+                <span>${(i.price * i.qty).toFixed(2)}</span>
+              </div>
+            ))}
+            {order.deliveryFee > 0 && <div className="flex justify-between pt-2 border-t border-white/20">
+              <span>Envío</span><span>${order.deliveryFee.toFixed(2)}</span>
+            </div>}
+            <div className="pt-4 text-right font-bold text-xl">Total: ${order.total.toFixed(2)}</div>
+          </div>
+          <p className="mt-8 text-sm opacity-80">Estado: {order.paymentStatus}</p>
+        </div>
+      </div>
+    );
+
+    // ==== LOGIN ====
+    const Login = () => {
+      const [email, setEmail] = useState("");
+      const [pass, setPass] = useState("");
+      const login = (e) => {
+        e.preventDefault();
+        signInWithEmailAndPassword(auth, email, pass).catch(() => Swal.fire("Error", "Credenciales incorrectas", "error"));
+      };
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6">
+          <div className="glass rounded-3xl shadow-2xl p-10 max-w-md w-full text-white">
+            <h1 className="text-4xl font-bold mb-2 text-center">Homemart PRO</h1>
+            <p className="text-center mb-8 opacity-80">Sistema de Punto de Venta</p>
+            <form onSubmit={login} className="space-y-6">
+              <Input placeholder="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} />
+              <Input placeholder="Contraseña" type="password" value={pass} onChange={e=>setPass(e.target.value)} />
+              <Button type="submit" className="w-full">Iniciar Sesión</Button>
+            </form>
+          </div>
+        </div>
+      );
+    };
+
+    // ==== POS MODULE (con variantes, descuentos, delivery, impresión) ====
+    function POSModule({ products, shift, user }) {
+      const [cart, setCart] = useState([]);
+      const [search, setSearch] = useState("");
+      const [delivery, setDelivery] = useState(0);
+      const [discount, setDiscount] = useState(0);
+      const [selProd, setSelProd] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      const addToCart = (p, variant = null) => {
+        const stock = variant ? variant.stock : p.stock;
+        if (stock <= 0) return Swal.fire("Error", "Sin stock", "error");
+
+        const cartId = variant ? `\( {p.id}- \){variant.name}` : p.id;
+        const exists = cart.find(x => x.cartId === cartId);
+
+        if (exists) {
+          if (exists.qty + 1 > stock) return Swal.fire("Error", "Stock insuficiente", "error");
+          setCart(cart.map(x => x.cartId === cartId ? {...x, qty: x.qty + 1} : x));
+        } else {
+          setCart([...cart, {
+            cartId, id: p.id, name: p.name, variantName: variant?.name,
+            price: variant?.price || p.price, cost: variant?.cost || p.cost,
+            qty: 1
+          }]);
+        }
+      };
+
+      const subtotal = cart.reduce((acc, el) => acc + (el.price * el.qty), 0);
+      const total = (subtotal * (1 - discount / 100)) + parseFloat(delivery || 0);
+
+      const printTicket = (sale) => {
+        try {
+          const printer = new escpos.Printer();
+          printer.align('ct').text('Homemart PRO');
+          printer.text('-----------------------------');
+          sale.items.forEach(i => {
+            printer.text(`\( {i.qty}x \){i.name} ${i.variantName || ''} \[ {i.price.toFixed(2)}`);
+          });
+          printer.text('-----------------------------');
+          printer.text(`Subtotal: \]{subtotal.toFixed(2)}`);
+          if (discount > 0) printer.text(`Descuento: ${discount}%`);
+          if (delivery > 0) printer.text(`Envío: \[ {delivery.toFixed(2)}`);
+          printer.text(`TOTAL: \]{total.toFixed(2)}`);
+          printer.cut().close();
+        } catch (e) { Swal.fire("Error", "Impresora no conectada", "error"); }
+      };
+
+      const checkout = async (method) => {
+        setLoading(true);
+        try {
+          const sale = {
+            date: serverTimestamp(),
+            shiftId: shift.id,
+            cashierId: user.uid,
+            items: cart,
+            subtotal,
+            discount,
+            deliveryFee: parseFloat(delivery || 0),
+            total,
+            paymentStatus: method === 'whatsapp' ? 'Pendiente' : 'Pagado',
+            method
+          };
+          const batch = writeBatch(db);
+          const saleRef = doc(collection(db, "sales"));
+          batch.set(saleRef, sale);
+
+          cart.forEach(item => {
+            const prodRef = doc(db, "products", item.id);
+            batch.update(prodRef, { stock: increment(-item.qty) }); // Soporte variantes: actualizaría variant.stock si existiera
+          });
+
+          await batch.commit();
+
+          if (method !== 'whatsapp') {
+            printTicket(sale);
+            Swal.fire("Éxito", "Venta registrada!", "success");
+          } else {
+            const link = `\( {window.location.origin} \){window.location.pathname}?orderId=${saleRef.id}`;
+            const msg = `*Pedido Homemart PRO*\n\n\( {cart.map(i=>` \){i.qty}x \( {i.name} \){i.variantName ? '('+i.variantName+')' : ''} - \[ {(i.price*i.qty).toFixed(2)}`).join('\n')}\n\nEnvío: \]{delivery.toFixed(2)}\nDescuento: ${discount}%\n*Total: $${total.toFixed(2)}*\n\nVer: ${link}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`);
+          }
+          setCart([]); setDelivery(0); setDiscount(0);
+        } catch (e) { console.error(e); Swal.fire("Error", "No se pudo registrar la venta", "error"); }
+        setLoading(false);
+      };
+
+      return (
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Productos */}
+          <div className="flex-1">
+            <Input placeholder="Buscar productos..." value={search} onChange={e=>setSearch(e.target.value)} />
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-4 scrollbar-hide overflow-y-auto max-h-[70vh]">
+              {products.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())).map(p => (
+                <button key={p.id} onClick={()=>p.variants?.length ? setSelProd(p) : addToCart(p)}
+                  className="glass p-4 rounded-xl hover:shadow-xl transition-all text-white text-left">
+                  <h3 className="font-bold mb-2">{p.name}</h3>
+                  <p className="text-sm opacity-80">Stock: {p.stock}</p>
+                  <p className="text-lg font-bold mt-2">${p.price.toFixed(2)}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Carrito */}
+          <div className="lg:w-96 glass rounded-xl p-6">
+            <h2 className="text-xl font-bold mb-4 text-white">Orden Actual</h2>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {cart.map(i => (
+                <div key={i.cartId} className="flex justify-between text-white">
+                  <span>{i.qty}x {i.name} {i.variantName}</span>
+                  <span>${(i.price*i.qty).toFixed(2)}</span>
+                  <Button variant="danger" icon="trash" size="sm" onClick={()=>setCart(cart.filter(x=>x.cartId!==i.cartId))} />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 space-y-3 text-white">
+              <Input label="Envío ($)" type="number" value={delivery} onChange={e=>setDelivery(e.target.value)} />
+              <Input label="Descuento (%)" type="number" value={discount} onChange={e=>setDiscount(e.target.value)} />
+              <p className="text-2xl font-bold text-right">Total: ${total.toFixed(2)}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <Button variant="success" icon="whatsapp" disabled={loading || !cart.length} onClick={()=>checkout('whatsapp')}>WhatsApp</Button>
+              <Button icon="dollar" disabled={loading || !cart.length} onClick={()=>checkout('local')}>Cobrar</Button>
+            </div>
+          </div>
+
+          {/* Modal Variantes */}
+          {selProd && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+              <div className="glass p-6 rounded-xl max-w-md w-full text-white">
+                <h3 className="font-bold mb-4">{selProd.name}</h3>
+                <div className="space-y-2">
+                  {selProd.variants.map(v => (
+                    <button key={v.name} onClick={()=>{addToCart(selProd, v); setSelProd(null)}} className="w-full flex justify-between p-3 hover:bg-white/10 rounded">
+                      <span>{v.name}</span><span>${v.price.toFixed(2)}</span>
                     </button>
+                  ))}
                 </div>
-                <div class="flex-1 overflow-y-auto p-4 pb-24">
-                    <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-                        <table class="w-full text-left text-sm">
-                            <thead class="bg-gray-50 border-b text-xs uppercase text-gray-400"><tr><th class="p-3 font-bold">Prod</th><th class="p-3 font-bold text-right">Acción</th></tr></thead>
-                            <tbody id="inventory-list"></tbody>
-                        </table>
-                    </div>
-                </div>
+                <Button variant="outline" onClick={()=>setSelProd(null)} className="mt-4 w-full">Cerrar</Button>
+              </div>
             </div>
-
-            <!-- VISTA: ÓRDENES -->
-            <div id="view-orders" class="view-section hidden w-full h-full flex flex-col">
-                <div class="p-4 bg-white border-b shrink-0">
-                    <h2 class="text-lg font-bold text-gray-800">Historial</h2>
-                </div>
-                <div class="flex-1 overflow-y-auto p-4 pb-24">
-                    <div class="space-y-3" id="orders-list-mobile"></div>
-                </div>
-            </div>
-
-            <!-- SIDEBAR CARRITO (Responsive) -->
-            <div id="cart-sidebar" class="fixed inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 flex flex-col h-[100dvh]">
-                <div class="p-4 bg-gray-50 border-b flex justify-between items-center shrink-0 safe-top">
-                    <h3 class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="shopping-cart" class="w-5 h-5 text-indigo-600"></i> Carrito</h3>
-                    <div class="flex items-center gap-3">
-                        <button onclick="clearCart()" class="text-xs text-red-500 font-bold uppercase p-2">Limpiar</button>
-                        <button onclick="toggleCartSidebar()" class="md:hidden bg-white p-2 rounded-full shadow border text-gray-500"><i data-lucide="x" class="w-5 h-5"></i></button>
-                    </div>
-                </div>
-                
-                <div id="cart-items" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                
-                <div class="p-4 bg-gray-50 border-t shrink-0 safe-bottom">
-                    <div class="space-y-1 mb-3">
-                        <div class="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span id="cart-subtotal" class="font-mono">C$0.00</span></div>
-                        <div class="flex justify-between text-sm text-indigo-600 font-medium">
-                            <span class="flex items-center gap-1">IVA (15%) <input type="checkbox" checked id="tax-toggle" class="ml-1 w-4 h-4 accent-indigo-600" onchange="renderCart()"></span>
-                            <span id="cart-tax" class="font-mono">C$0.00</span>
-                        </div>
-                        <div class="flex justify-between text-xl font-black text-gray-800 pt-2 border-t"><span>Total</span><span id="cart-total">C$0.00</span></div>
-                    </div>
-                    <button onclick="openCheckout()" id="btn-checkout" class="w-full bg-indigo-600 active:bg-indigo-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 flex justify-center items-center gap-2 disabled:bg-gray-300 disabled:shadow-none transition-all">
-                        COBRAR AHORA <i data-lucide="arrow-right" class="w-5 h-5"></i>
-                    </button>
-                </div>
-            </div>
-
-        </main>
-        
-        <!-- NAVEGACIÓN INFERIOR (MÓVIL) -->
-        <nav class="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around py-2 z-30 pb-safe">
-            <button onclick="switchView('pos')" id="nav-pos" class="flex flex-col items-center p-2 text-indigo-600 w-full">
-                <i data-lucide="store" class="w-6 h-6 mb-1"></i>
-                <span class="text-[10px] font-bold">Venta</span>
-            </button>
-            <button onclick="switchView('orders')" id="nav-orders" class="flex flex-col items-center p-2 text-gray-400 w-full hover:text-gray-600 transition">
-                <i data-lucide="list-ordered" class="w-6 h-6 mb-1"></i>
-                <span class="text-[10px] font-bold">Órdenes</span>
-            </button>
-            <button onclick="switchView('inventory')" id="nav-inventory" class="flex flex-col items-center p-2 text-gray-400 w-full hover:text-gray-600 transition">
-                <i data-lucide="package" class="w-6 h-6 mb-1"></i>
-                <span class="text-[10px] font-bold">Inventario</span>
-            </button>
-        </nav>
-        
-        <!-- NAVEGACIÓN DESKTOP (Top Bar Integration override) -->
-        <div class="hidden md:flex absolute top-3 right-20 gap-2 z-30">
-             <button onclick="switchView('pos')" id="btn-d-pos" class="px-3 py-1.5 rounded-md text-sm font-semibold bg-indigo-50 text-indigo-600">Ventas</button>
-             <button onclick="switchView('orders')" id="btn-d-orders" class="px-3 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700">Órdenes</button>
-             <button onclick="switchView('inventory')" id="btn-d-inventory" class="px-3 py-1.5 rounded-md text-sm font-semibold text-gray-500 hover:text-gray-700">Inventario</button>
+          )}
         </div>
-    </div>
+      );
+    }
 
-    <!-- VISTA CLIENTE (TRACKING) -->
-    <div id="tracking-screen" class="fixed inset-0 bg-gray-100 z-50 hidden overflow-y-auto">
-        <div class="max-w-md mx-auto bg-white min-h-screen shadow-2xl relative flex flex-col">
-            <div class="bg-indigo-600 p-8 pb-10 text-white text-center rounded-b-[2.5rem] shadow-lg relative z-10">
-                <div class="bg-white/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 backdrop-blur-sm">
-                     <i data-lucide="package-search" class="w-8 h-8"></i>
-                </div>
-                <h2 class="text-2xl font-black tracking-tight">RASTREO</h2>
-                <p class="opacity-80 text-sm font-mono mt-1" id="track-id">Cargando...</p>
-            </div>
-            
-            <div class="p-6 -mt-8 relative z-20 flex-1">
-                <!-- Card Estado -->
-                <div class="bg-white rounded-2xl shadow-xl border border-gray-100 p-6 mb-6 text-center">
-                    <p class="text-[10px] text-gray-400 font-bold uppercase mb-2 tracking-widest">Estatus Actual</p>
-                    <div id="track-status-badge" class="inline-block px-4 py-1.5 rounded-full text-sm font-black bg-gray-100 text-gray-600">...</div>
-                    
-                    <div class="mt-6 relative pt-2">
-                        <div class="flex justify-between text-[10px] font-bold text-gray-400 px-1 mb-2">
-                            <span>Recibido</span>
-                            <span>En Ruta</span>
-                            <span>Listo</span>
-                        </div>
-                        <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <div id="track-progress" class="bg-green-500 h-full w-0 transition-all duration-1000 rounded-full"></div>
-                        </div>
-                    </div>
-                </div>
+    // ==== INVENTARIO (con variantes) ====
+    function Inventory({ products }) {
+      const [modal, setModal] = useState(false);
+      const [form, setForm] = useState({ name:'', price:0, cost:0, stock:0, variants:[] });
+      const [vForm, setVForm] = useState({ name:'', price:0, cost:0, stock:0 });
 
-                <!-- Detalle -->
-                <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2"><i data-lucide="receipt" class="w-4 h-4 text-gray-400"></i> Tu Pedido</h3>
-                <div class="space-y-3 mb-6" id="track-items"></div>
+      const save = async () => {
+        if (!form.name) return;
+        await addDoc(collection(db, "products"), { ...form, price: +form.price, cost: +form.cost, stock: +form.stock });
+        setModal(false); setForm({ name:'', price:0, cost:0, stock:0, variants:[] });
+      };
 
-                <!-- Totales -->
-                <div class="bg-gray-50 p-4 rounded-xl space-y-2">
-                    <div class="flex justify-between text-xs text-gray-500"><span>Envío</span><span id="track-delivery">C$0.00</span></div>
-                    <div class="flex justify-between text-xl font-black text-gray-900 border-t pt-2 border-gray-200"><span>Total</span><span id="track-total">C$0.00</span></div>
-                    <div class="flex justify-between text-xs text-indigo-600 font-bold mt-1"><span>Pago:</span><span id="track-method">...</span></div>
-                </div>
+      const addVar = () => {
+        if (!vForm.name) return;
+        setForm({...form, variants: [...form.variants, { ...vForm, price: +vForm.price, cost: +vForm.cost, stock: +vForm.stock }]});
+        setVForm({ name:'', price:0, cost:0, stock:0 });
+      };
 
-                <div class="mt-6 text-center">
-                    <p class="text-xs text-gray-400 mb-1">Entregar a:</p>
-                    <p id="track-client" class="font-bold text-sm text-gray-800">...</p>
-                    <p id="track-address" class="text-xs text-gray-500 mt-1">...</p>
-                </div>
-            </div>
-            
-            <!-- SECCIÓN DEL BOTÓN ELIMINADA -->
-            
-        </div>
-    </div>
+      const del = async (id) => {
+        if (confirm("¿Eliminar?")) await deleteDoc(doc(db, "products", id));
+      };
 
-    <!-- MODAL PRODUCTO -->
-    <div id="modal-product" class="fixed inset-0 z-[80] bg-black/50 hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-lg shadow-2xl mobile-full-modal md:rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="bg-white p-4 border-b flex justify-between items-center shrink-0">
-                <h3 class="font-bold text-gray-800 text-lg" id="prod-modal-title">Producto</h3>
-                <button onclick="closeModal('modal-product')" class="bg-gray-100 p-2 rounded-full text-gray-500"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <form id="form-product" class="p-5 mobile-modal-content bg-gray-50">
-                <input type="hidden" id="prod-id">
-                <div class="grid gap-4">
-                    <div>
-                        <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Nombre del Producto</label>
-                        <input name="name" required class="w-full bg-white border border-gray-200 p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium" placeholder="Ej. Camiseta Premium">
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Categoría</label>
-                            <input name="category" list="cats-list" class="w-full bg-white border border-gray-200 p-3 rounded-xl outline-none text-sm" placeholder="Ej. Ropa">
-                            <datalist id="cats-list"></datalist>
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">URL Imagen</label>
-                            <input name="image" class="w-full bg-white border border-gray-200 p-3 rounded-xl outline-none text-sm" placeholder="https://...">
-                        </div>
-                    </div>
-
-                    <!-- Toggle Variantes -->
-                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 flex items-center gap-3">
-                        <input type="checkbox" id="has-variants" class="w-5 h-5 accent-indigo-600 rounded" onchange="toggleVariantsUI()">
-                        <label for="has-variants" class="text-sm font-bold text-indigo-900 cursor-pointer select-none">Habilitar Variantes (Talla, Color)</label>
-                    </div>
-
-                    <!-- Campos Simples -->
-                    <div id="simple-fields" class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Precio (C$)</label>
-                            <input type="number" step="0.01" id="prod-price" class="w-full bg-white border border-gray-200 p-3 rounded-xl font-bold text-gray-800 outline-none text-lg">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 mb-1 uppercase">Stock Actual</label>
-                            <input type="number" id="prod-stock" class="w-full bg-white border border-gray-200 p-3 rounded-xl outline-none text-lg font-mono">
-                        </div>
-                    </div>
-
-                    <!-- Campos Variantes -->
-                    <div id="variants-fields" class="hidden space-y-3">
-                        <p class="text-xs text-gray-400 font-bold uppercase">Lista de Variantes</p>
-                        <div id="variants-list" class="space-y-2"></div>
-                        <button type="button" onclick="addVariantRow()" class="w-full py-3 border-2 border-dashed border-indigo-300 text-indigo-600 font-bold rounded-xl text-xs hover:bg-indigo-50">+ Agregar Variante</button>
-                    </div>
-                </div>
-            </form>
-            
-            <div class="p-4 bg-white border-t flex gap-3 shrink-0">
-                <button type="button" onclick="deleteProduct()" id="btn-delete-prod" class="bg-red-50 text-red-600 px-4 py-3 rounded-xl font-bold hidden active:bg-red-100"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
-                <button onclick="document.getElementById('form-product').requestSubmit()" class="flex-1 bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition-transform">GUARDAR PRODUCTO</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL CHECKOUT -->
-    <div id="modal-checkout" class="fixed inset-0 z-[80] bg-black/60 hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md shadow-2xl mobile-full-modal md:rounded-2xl overflow-hidden flex flex-col h-full md:h-auto md:max-h-[90vh]">
-            <div class="bg-gray-900 p-4 text-white flex justify-between items-center shrink-0">
-                <h3 class="font-bold flex items-center gap-2 text-lg"><i data-lucide="wallet" class="w-5 h-5"></i> Finalizar Venta</h3>
-                <button onclick="closeModal('modal-checkout')" class="bg-gray-800 p-2 rounded-full text-gray-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <form id="form-checkout" class="p-5 space-y-4 mobile-modal-content bg-gray-50">
-                <!-- Info Cliente -->
-                <div class="space-y-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Datos del Cliente</p>
-                    <input type="text" id="co-client" required class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-indigo-500 font-medium" placeholder="Nombre completo *">
-                    <div class="grid grid-cols-2 gap-3">
-                        <input type="tel" id="co-phone" required class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm outline-none focus:border-indigo-500" placeholder="WhatsApp *">
-                        <select id="co-method" class="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl text-sm outline-none font-bold text-gray-700">
-                            <option value="Efectivo">Efectivo</option>
-                            <option value="Tarjeta">Tarjeta</option>
-                            <option value="Transferencia">Transferencia</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Delivery Toggle -->
-                <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 transition-all">
-                    <label class="flex items-center justify-between cursor-pointer">
-                        <span class="text-sm font-bold text-indigo-900 flex items-center gap-2"><i data-lucide="bike" class="w-5 h-5"></i> ¿Es Delivery?</span>
-                        <input type="checkbox" id="co-is-delivery" class="accent-indigo-600 w-5 h-5 rounded" onchange="toggleDelivery()">
-                    </label>
-                    <div id="co-delivery-opts" class="hidden mt-4 pt-3 border-t border-indigo-200 space-y-3">
-                        <input type="text" id="co-address" class="w-full bg-white border border-indigo-200 p-3 rounded-xl text-sm outline-none" placeholder="Dirección exacta...">
-                        <div class="flex items-center justify-between bg-white p-2 rounded-xl border border-indigo-200">
-                            <span class="text-xs font-bold text-indigo-800 ml-2">Costo Envío:</span>
-                            <div class="flex items-center">
-                                <span class="text-xs text-gray-500 mr-1">C$</span>
-                                <input type="number" id="co-ship-cost" value="0" step="0.01" class="w-20 font-bold text-right outline-none p-1" oninput="updateCheckoutTotals()">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pago y Cambio (Solo efectivo) -->
-                <div id="cash-change-box" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                    <label class="block text-[10px] font-bold text-gray-400 mb-2 uppercase">Pago en Efectivo</label>
-                    <div class="flex gap-4 items-center">
-                        <div class="flex-1 relative">
-                            <span class="absolute left-3 top-3 text-gray-400 font-bold">C$</span>
-                            <input type="number" id="co-paid" placeholder="0.00" class="w-full border-2 border-gray-200 p-2 pl-9 rounded-xl text-xl font-bold outline-none focus:border-indigo-500 text-gray-800" oninput="calcChange()">
-                        </div>
-                        <div class="text-right min-w-[80px]">
-                            <span class="block text-[10px] text-gray-400 uppercase font-bold">Cambio</span>
-                            <span id="co-change" class="text-xl font-black text-gray-300">C$0</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Resumen Totales -->
-                <div class="bg-gray-800 text-gray-300 p-4 rounded-xl space-y-1 mt-4">
-                    <div class="flex justify-between text-xs"><span>Subtotal</span><span id="co-sub">C$0.00</span></div>
-                    <div class="flex justify-between text-xs"><span>IVA (15%)</span><span id="co-tax-val">C$0.00</span></div>
-                    <div class="flex justify-between text-xs font-bold text-indigo-300 hidden" id="co-ship-row"><span>Envío</span><span id="co-ship-val">C$0.00</span></div>
-                    <div class="flex justify-between text-2xl font-black text-white pt-2 mt-2 border-t border-gray-700"><span>TOTAL</span><span id="co-total">C$0.00</span></div>
-                </div>
-            </form>
-            
-            <div class="p-4 bg-white border-t shrink-0">
-                <button onclick="document.getElementById('form-checkout').requestSubmit()" id="btn-confirm-co" class="w-full bg-green-600 active:bg-green-700 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-95 transition-transform text-lg flex justify-center items-center gap-2">
-                    CONFIRMAR PEDIDO <i data-lucide="check-circle-2" class="w-5 h-5"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL DETALLE ORDEN (ADMIN) -->
-    <div id="modal-order-detail" class="fixed inset-0 z-[80] bg-black/60 hidden flex items-center justify-center backdrop-blur-sm">
-        <div class="bg-white w-full max-w-md shadow-2xl mobile-full-modal md:rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="bg-white p-4 border-b flex justify-between items-center shrink-0">
+      return (
+        <div>
+          <h2 className="text-2xl font-bold mb-6 text-white">Inventario</h2>
+          <Button icon="plus" onClick={()=>setModal(true)}>Nuevo Producto</Button>
+          <div className="mt-6 space-y-4">
+            {products.map(p => (
+              <div key={p.id} className="glass p-4 rounded-xl text-white flex justify-between">
                 <div>
-                    <h3 class="font-bold text-gray-800 leading-tight" id="od-id">Orden #...</h3>
-                    <p class="text-[10px] text-gray-400 font-mono" id="od-date">...</p>
+                  <h3 className="font-bold">{p.name}</h3>
+                  <p>Precio: \( {p.price} | Costo: \){p.cost} | Stock: {p.stock}</p>
+                  {p.variants.length > 0 && <p>Variantes: {p.variants.map(v=>v.name).join(', ')}</p>}
                 </div>
-                <button onclick="closeModal('modal-order-detail')" class="bg-gray-100 p-2 rounded-full text-gray-500"><i data-lucide="x" class="w-5 h-5"></i></button>
-            </div>
-            
-            <div class="p-5 overflow-y-auto flex-1 bg-gray-50/50 mobile-modal-content">
-                <!-- Control Estatus -->
-                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-4 grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="text-[10px] font-bold text-gray-400 uppercase">Estatus Pedido</label>
-                        <select id="od-status" onchange="updateOrderStatus()" class="w-full text-xs font-bold border border-gray-200 rounded-lg p-2 mt-1 bg-gray-50 outline-none">
-                            <option value="recibido">Recibido</option>
-                            <option value="proceso">En Proceso</option>
-                            <option value="ruta">En Ruta</option>
-                            <option value="entregado">Entregado</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
-                    </div>
-                    <div>
-                         <label class="text-[10px] font-bold text-gray-400 uppercase">Estatus Pago</label>
-                        <select id="od-pay-status" onchange="updateOrderStatus()" class="w-full text-xs font-bold border border-gray-200 rounded-lg p-2 mt-1 bg-gray-50 outline-none">
-                            <option value="pendiente">Pendiente</option>
-                            <option value="pagado">Pagado</option>
-                        </select>
-                    </div>
-                </div>
+                <Button variant="danger" icon="trash" onClick={()=>del(p.id)} />
+              </div>
+            ))}
+          </div>
 
-                <div class="bg-white p-4 rounded-xl shadow-sm mb-4 border border-gray-100">
-                    <p class="text-xs text-gray-500 mb-3 flex items-center gap-1"><i data-lucide="user" class="w-3 h-3"></i> <span id="od-client" class="font-bold text-gray-800"></span></p>
-                    <div id="od-items" class="space-y-3 text-sm border-t border-dashed pt-3"></div>
-                    <div class="flex justify-between font-black text-xl mt-4 pt-3 border-t text-indigo-700">
-                        <span>Total</span>
-                        <span id="od-total">C$0.00</span>
+          {modal && (
+            <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+              <div className="glass p-6 rounded-xl max-w-lg w-full text-white">
+                <h3 className="font-bold text-xl mb-4">Nuevo Producto</h3>
+                <div className="space-y-4">
+                  <Input label="Nombre" value={form.name} onChange={e=>setForm({...form, name:e.target.value})} />
+                  <div className="grid grid-cols-3 gap-3">
+                    <Input label="Precio" type="number" value={form.price} onChange={e=>setForm({...form, price:e.target.value})} />
+                    <Input label="Costo" type="number" value={form.cost} onChange={e=>setForm({...form, cost:e.target.value})} />
+                    <Input label="Stock" type="number" value={form.stock} onChange={e=>setForm({...form, stock:e.target.value})} />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="font-bold">Variantes</p>
+                    <div className="grid grid-cols-4 gap-2">
+                      <Input placeholder="Nombre (ej: Rojo)" value={vForm.name} onChange={e=>setVForm({...vForm, name:e.target.value})} />
+                      <Input type="number" placeholder="Precio" value={vForm.price} onChange={e=>setVForm({...vForm, price:e.target.value})} />
+                      <Input type="number" placeholder="Costo" value={vForm.cost} onChange={e=>setVForm({...vForm, cost:e.target.value})} />
+                      <Input type="number" placeholder="Stock" value={vForm.stock} onChange={e=>setVForm({...vForm, stock:e.target.value})} />
                     </div>
+                    <Button onClick={addVar} variant="outline">Agregar Variante</Button>
+                    <div className="flex flex-wrap gap-2">
+                      {form.variants.map(v => <span key={v.name} className="bg-white/20 p-2 rounded">{v.name} (${v.price}, Stock: {v.stock})</span>)}
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={()=>setModal(false)}>Cancelar</Button>
+                    <Button onClick={save}>Guardar</Button>
+                  </div>
                 </div>
-                
-                <div class="text-center pb-4">
-                    <p class="text-[10px] text-gray-400">Atendido por: <span id="od-seller" class="font-bold"></span></p>
-                </div>
+              </div>
             </div>
-
-            <div class="p-4 bg-white border-t flex gap-2 shrink-0">
-                 <button onclick="sendWhatsAppAdmin()" class="flex-1 bg-green-500 active:bg-green-600 text-white py-3 rounded-xl font-bold flex justify-center gap-2 items-center text-sm shadow active:scale-95 transition-transform">
-                    <i data-lucide="message-circle" class="w-5 h-5"></i> Enviar WhatsApp
-                </button>
-                <button onclick="copyTrackingLink()" class="px-4 bg-gray-100 active:bg-gray-200 text-gray-600 rounded-xl" title="Copiar Link"><i data-lucide="link" class="w-5 h-5"></i></button>
-            </div>
+          )}
         </div>
-    </div>
+      );
+    }
 
-    <!-- LOGICA -->
-    <script type="module">
-        const manualConfig = {
-            apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU", 
-            authDomain: "posdeventas-a03ca.firebaseapp.com",
-            projectId: "posdeventas-a03ca",
-            storageBucket: "posdeventas-a03ca.firebasestorage.app",
-            messagingSenderId: "975141670948",
-            appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
-        };
+    // ==== HISTORIAL (con filtros) ====
+    function HistoryView({ sales }) {
+      const [filter, setFilter] = useState("");
 
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, onSnapshot, query, orderBy, deleteDoc, runTransaction, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously, updateProfile, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+      const filteredSales = sales.filter(s => s.paymentStatus.toLowerCase().includes(filter.toLowerCase()) || s.method?.toLowerCase().includes(filter.toLowerCase()));
 
-        let db, auth, currentUser;
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pos-pro-mobile-v2';
-        
-        let products = [];
-        let cart = [];
-        let orders = [];
-        let selectedOrder = null; 
-        let isRegisterMode = false; 
+      return (
+        <div>
+          <h2 className="text-2xl font-bold mb-6 text-white">Historial de Ventas</h2>
+          <Input placeholder="Filtrar por estado o método" value={filter} onChange={e=>setFilter(e.target.value)} />
+          <div className="mt-6 space-y-4">
+            {filteredSales.map(s => (
+              <div key={s.id} className="glass p-4 rounded-xl text-white">
+                <p className="font-bold">Fecha: {s.date.toLocaleString()}</p>
+                <p>Total: ${s.total.toFixed(2)}</p>
+                <p>Estado: {s.paymentStatus}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
 
-        // --- HELPER DE VIBRACIÓN ---
-        const vibrate = () => { if(navigator.vibrate) navigator.vibrate(50); };
-
-        async function init() {
-            try {
-                let config = (typeof __firebase_config !== 'undefined' && __firebase_config) ? JSON.parse(__firebase_config) : manualConfig;
-                const app = initializeApp(config);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                if (window.lucide) window.lucide.createIcons();
-
-                const urlParams = new URLSearchParams(window.location.search);
-                const trackingId = urlParams.get('track');
-
-                onAuthStateChanged(auth, async (user) => {
-                    document.getElementById('loading-screen').classList.add('hidden');
-                    if (trackingId) {
-                        if(!user) await signInAnonymously(auth); 
-                        loadTracking(trackingId);
-                        return; 
-                    } 
-                    if (user && !user.isAnonymous) {
-                        currentUser = user;
-                        if(!user.displayName) document.getElementById('modal-setup-user').classList.remove('hidden');
-                        else launchApp();
-                    } else {
-                        document.getElementById('auth-screen').classList.remove('hidden');
-                    }
-                });
-            } catch (e) { showToast(`Error Conexión: ${e.message}`, 'error'); }
-        }
-
-        function launchApp() {
-            document.getElementById('auth-screen').classList.add('hidden');
-            document.getElementById('modal-setup-user').classList.add('hidden');
-            document.getElementById('app-screen').classList.remove('hidden');
-            document.getElementById('header-username').innerText = currentUser.displayName || currentUser.email;
-            loadProducts();
-            loadOrders();
-        }
-
-        // --- FIRESTORE ---
-        function loadProducts() {
-            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), (snap) => {
-                products = [];
-                snap.forEach(d => products.push({ id: d.id, ...d.data() }));
-                renderGrid();
-                renderInventory();
-                updateCatFilter();
-            });
-        }
-
-        function loadOrders() {
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'orders'), orderBy('createdAt', 'desc'));
-            onSnapshot(q, (snap) => {
-                orders = [];
-                snap.forEach(d => orders.push({ id: d.id, ...d.data() }));
-                renderOrdersListMobile();
-            });
-        }
-
-        // --- POS & GRID ---
-        function renderGrid() {
-            const term = document.getElementById('search-input').value.toLowerCase();
-            const cat = document.getElementById('cat-filter').value;
-            const grid = document.getElementById('product-grid');
-            
-            const filtered = products.filter(p => p.name.toLowerCase().includes(term) && (!cat || p.category === cat));
-
-            grid.innerHTML = filtered.map(p => {
-                const hasVars = p.variants && p.variants.length > 0;
-                const minPrice = hasVars ? p.variants.reduce((min, v) => Math.min(min, v.price), Infinity) : p.price;
-                const stockDisplay = hasVars ? p.variants.reduce((a,b)=>a+parseInt(b.stock),0) : p.stock;
-                
-                return `
-                <div onclick="addBoxClick('${p.id}', ${hasVars})" class="bg-white rounded-xl shadow-sm border border-gray-100 cursor-pointer active:scale-95 transition-transform overflow-hidden relative flex flex-col h-44">
-                    ${stockDisplay < 5 && stockDisplay > 0 ? '<span class="absolute top-2 right-2 bg-yellow-100 text-yellow-600 text-[9px] font-bold px-1.5 py-0.5 rounded-md z-10">Bajo Stock</span>' : ''}
-                    ${stockDisplay <= 0 ? '<span class="absolute top-2 right-2 bg-red-100 text-red-600 text-[9px] font-bold px-1.5 py-0.5 rounded-md z-10">AGOTADO</span>' : ''}
-                    <div class="h-24 bg-gray-50 flex items-center justify-center p-2">
-                        ${p.image ? `<img src="${p.image}" onerror="this.src='https://placehold.co/100x100/f3f4f6/9ca3af?text=IMG'" class="h-full w-full object-contain rounded-lg">` : `<i data-lucide="package" class="text-gray-300 w-8 h-8"></i>`}
-                    </div>
-                    <div class="p-2 flex-1 flex flex-col justify-between">
-                        <p class="text-xs font-bold text-gray-700 line-clamp-2 leading-tight">${p.name}</p>
-                        <div class="flex flex-col items-start mt-1">
-                            <span class="text-sm font-black text-indigo-600">C$${minPrice.toFixed(2)}</span>
-                            ${hasVars ? '<span class="text-[9px] text-gray-400 font-medium">Variantes</span>' : ''}
-                        </div>
-                    </div>
-                </div>`
-            }).join('');
-            lucide.createIcons();
-        }
-        
-        window.addBoxClick = (id, hasVars) => {
-            vibrate();
-            const p = products.find(x => x.id === id);
-            if (!p) return;
-            const totalStock = hasVars ? p.variants.reduce((a,b)=>a+parseInt(b.stock),0) : p.stock;
-            if(totalStock <= 0) { showToast("Producto Agotado.", "error"); return; }
-            
-            if(hasVars) {
-                const availableVariant = p.variants.find(v => v.stock > 0);
-                if(availableVariant) addToCart(id, availableVariant);
-                else showToast("Todas las variantes están agotadas.", "error");
-            } else {
-                addToCart(id);
-            }
-        };
-        
-        document.getElementById('search-input').addEventListener('input', renderGrid);
-        document.getElementById('cat-filter').addEventListener('change', renderGrid);
-
-        function updateCatFilter() {
-            const cats = [...new Set(products.map(p => p.category))].filter(Boolean).sort();
-            const sel = document.getElementById('cat-filter');
-            sel.innerHTML = '<option value="">Todo</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
-        }
-
-        // --- CARRITO ---
-        window.toggleCartSidebar = () => document.getElementById('cart-sidebar').classList.toggle('translate-x-full');
-
-        window.addToCart = (prodId, variant = null) => {
-            const p = products.find(x => x.id === prodId);
-            const cartId = variant ? `${p.id}-${variant.name}` : p.id;
-            const existing = cart.find(i => i.cartId === cartId);
-            const maxStock = variant ? parseInt(variant.stock) : parseInt(p.stock);
-            const price = variant ? parseFloat(variant.price) : parseFloat(p.price);
-            const name = variant ? `${p.name} (${variant.name})` : p.name;
-            
-            if(maxStock <= 0) { showToast("Sin stock", "error"); return; }
-            if(existing && existing.qty + 1 > maxStock) { showToast("Stock máximo alcanzado", "error"); return; }
-
-            if(existing) existing.qty++;
-            else cart.push({ cartId, prodId, name, price, qty: 1, maxStock, isVariant: !!variant, variantName: variant?.name });
-            
-            renderCart();
-            showToast("Agregado al carrito");
-        };
-
-        window.updateQty = (cartId, delta) => {
-            vibrate();
-            const item = cart.find(i => i.cartId === cartId);
-            if(!item) return;
-            const newQty = item.qty + delta;
-            if(newQty > item.maxStock) { showToast("Max Stock", "error"); return; }
-            if(newQty <= 0) cart = cart.filter(i => i.cartId !== cartId);
-            else item.qty = newQty;
-            renderCart();
-        };
-
-        window.clearCart = () => { vibrate(); cart = []; renderCart(); };
-
-        window.renderCart = () => {
-            const list = document.getElementById('cart-items');
-            const taxOn = document.getElementById('tax-toggle').checked;
-            let sub = 0;
-            
-            if(cart.length === 0) {
-                list.innerHTML = `<div class="flex flex-col items-center justify-center h-40 text-gray-300"><i data-lucide="shopping-bag" class="w-12 h-12 mb-2 opacity-50"></i><p class="text-xs font-bold">Carrito vacío</p></div>`;
-                document.getElementById('btn-checkout').disabled = true;
-            } else {
-                document.getElementById('btn-checkout').disabled = false;
-                list.innerHTML = cart.map(i => {
-                    sub += i.price * i.qty;
-                    return `
-                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100 mb-2">
-                        <div class="leading-tight flex-1 pr-2">
-                            <p class="text-xs font-bold text-gray-700 line-clamp-1">${i.name}</p>
-                            <p class="text-[10px] text-gray-500 font-mono">C$${i.price.toFixed(2)}</p>
-                        </div>
-                        <div class="flex items-center gap-2 bg-white rounded-lg border px-1 h-8 shadow-sm">
-                            <button onclick="updateQty('${i.cartId}', -1)" class="w-6 h-full font-bold text-gray-400 hover:text-red-500 flex items-center justify-center">-</button>
-                            <span class="text-xs font-bold w-4 text-center">${i.qty}</span>
-                            <button onclick="updateQty('${i.cartId}', 1)" class="w-6 h-full font-bold text-indigo-600 flex items-center justify-center">+</button>
-                        </div>
-                        <p class="text-xs font-bold text-indigo-700 w-16 text-right">C$${(i.price * i.qty).toFixed(2)}</p>
-                    </div>`;
-                }).join('');
-            }
-            
-            const tax = taxOn ? sub * 0.15 : 0;
-            const total = sub + tax;
-            
-            document.getElementById('cart-subtotal').innerText = `C$${sub.toFixed(2)}`;
-            document.getElementById('cart-tax').innerText = `C$${tax.toFixed(2)}`;
-            document.getElementById('cart-total').innerText = `C$${total.toFixed(2)}`;
-            
-            const count = cart.reduce((a,b) => a+b.qty, 0);
-            document.getElementById('badge-cart').innerText = count;
-            document.getElementById('badge-cart').classList.toggle('hidden', count === 0);
-            
-            lucide.createIcons();
-            if(!document.getElementById('modal-checkout').classList.contains('hidden')) updateCheckoutTotals();
-        };
-
-        // --- CHECKOUT FIXED PATH ---
-        window.openCheckout = () => {
-            toggleCartSidebar(); // Close sidebar first
-            document.getElementById('modal-checkout').classList.remove('hidden');
-            document.getElementById('form-checkout').reset();
-            updateCheckoutTotals();
-        };
-
-        window.toggleDelivery = () => {
-            const isDel = document.getElementById('co-is-delivery').checked;
-            document.getElementById('co-delivery-opts').classList.toggle('hidden', !isDel);
-            document.getElementById('co-ship-row').classList.toggle('hidden', !isDel);
-            updateCheckoutTotals();
-        };
-
-        window.updateCheckoutTotals = () => {
-            const subRaw = parseFloat(document.getElementById('cart-subtotal').innerText.replace('C$',''));
-            const taxRaw = parseFloat(document.getElementById('cart-tax').innerText.replace('C$',''));
-            const isDel = document.getElementById('co-is-delivery').checked;
-            const ship = isDel ? (parseFloat(document.getElementById('co-ship-cost').value) || 0) : 0;
-            const total = subRaw + taxRaw + ship;
-            
-            document.getElementById('co-sub').innerText = `C$${subRaw.toFixed(2)}`;
-            document.getElementById('co-tax-val').innerText = `C$${taxRaw.toFixed(2)}`;
-            document.getElementById('co-ship-val').innerText = `C$${ship.toFixed(2)}`;
-            document.getElementById('co-total').innerText = `C$${total.toFixed(2)}`;
-            
-            calcChange();
-        };
-
-        window.calcChange = () => {
-             const total = parseFloat(document.getElementById('co-total').innerText.replace('C$',''));
-             const paid = parseFloat(document.getElementById('co-paid').value) || 0;
-             const method = document.getElementById('co-method').value;
-             const el = document.getElementById('co-change');
-             const btn = document.getElementById('btn-confirm-co');
-
-             if(method !== 'Efectivo') {
-                 document.getElementById('co-paid').disabled = true;
-                 document.getElementById('co-paid').value = "";
-                 el.innerText = "N/A";
-                 el.className = `text-xl font-black text-gray-300`;
-                 btn.disabled = false;
-                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
-             } else {
-                 document.getElementById('co-paid').disabled = false;
-                 const change = paid - total;
-                 el.innerText = `C$${change.toFixed(2)}`;
-                 el.className = `text-xl font-black ${change < 0 ? 'text-red-400' : 'text-green-500'}`;
-                 
-                 if(change < -0.01) {
-                     btn.disabled = true;
-                     btn.classList.add('opacity-50', 'cursor-not-allowed');
-                 } else {
-                     btn.disabled = false;
-                     btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                 }
-             }
-        };
-        document.getElementById('co-method').addEventListener('change', calcChange);
-
-        document.getElementById('form-checkout').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            vibrate();
-            const btn = document.getElementById('btn-confirm-co');
-            btn.disabled = true; btn.innerText = "GUARDANDO...";
-            
-            try {
-                // *** FIX: RUTA CORREGIDA PARA CONTADORES ***
-                // Antes: .../counters/orders_... (ERROR)
-                // Ahora: .../public/data/counters/orders_... (CORRECTO - Estructura Coll/Doc)
-                const todayStr = new Date().toISOString().slice(0,10).replace(/-/g,''); 
-                const counterRef = doc(db, 'artifacts', appId, 'public', 'data', 'counters', 'orders_' + todayStr);
-                
-                let seq = 1;
-                await runTransaction(db, async (t) => {
-                    const docCtr = await t.get(counterRef);
-                    if(docCtr.exists()) {
-                        seq = docCtr.data().val + 1;
-                        t.update(counterRef, { val: seq });
-                    } else {
-                        // Debemos asegurar que el documento padre 'counters' existe si fuera necesario, 
-                        // pero Firestore crea documentos implícitos.
-                        t.set(counterRef, { val: 1 });
-                    }
-                });
-                
-                const orderId = `0025-${todayStr}-${String(seq).padStart(3, '0')}`;
-                
-                const isDel = document.getElementById('co-is-delivery').checked;
-                const paidValue = parseFloat(document.getElementById('co-paid').value) || 0;
-                
-                const orderData = {
-                    displayId: orderId,
-                    createdAt: new Date().toISOString(),
-                    cart: cart,
-                    client: document.getElementById('co-client').value,
-                    phone: document.getElementById('co-phone').value,
-                    method: document.getElementById('co-method').value,
-                    isDelivery: isDel,
-                    address: isDel ? document.getElementById('co-address').value : '',
-                    shipCost: isDel ? parseFloat(document.getElementById('co-ship-cost').value) : 0,
-                    subtotal: parseFloat(document.getElementById('co-sub').innerText.replace('C$','')),
-                    tax: parseFloat(document.getElementById('co-tax-val').innerText.replace('C$','')),
-                    total: parseFloat(document.getElementById('co-total').innerText.replace('C$','')),
-                    status: 'recibido',
-                    paymentStatus: document.getElementById('co-method').value === 'Efectivo' && paidValue >= parseFloat(document.getElementById('co-total').innerText.replace('C$','')) ? 'pagado' : 'pendiente',
-                    seller: currentUser.displayName,
-                    paidAmount: paidValue
-                };
-                
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', orderId), orderData);
-                
-                sendWhatsApp(orderData);
-                closeModal('modal-checkout');
-                cart = []; renderCart();
-                showToast("¡Venta Exitosa!");
-                
-            } catch(err) {
-                console.error(err);
-                showToast("Error al procesar: " + err.message, 'error');
-            }
-            btn.disabled = false; btn.innerHTML = `CONFIRMAR PEDIDO <i data-lucide="check-circle-2" class="w-5 h-5"></i>`;
+    // ==== DASHBOARD ====
+    function Dashboard({ sales, products }) {
+      const metrics = useMemo(() => {
+        let rev = 0, cost = 0, del = 0, items = 0;
+        sales.forEach(s => {
+          rev += s.total;
+          del += s.deliveryFee || 0;
+          s.items.forEach(i => { items += i.qty; cost += (i.cost * i.qty); });
         });
+        return { rev, net: rev - cost, del, items };
+      }, [sales]);
 
-        // --- WHATSAPP LOGIC ---
-        function sendWhatsApp(order) {
-            const phone = order.phone.replace(/\D/g,'');
-            const trackLink = `${window.location.origin}${window.location.pathname}?track=${order.displayId}`;
-            let text = `👋 Hola *${order.client}*, gracias por tu compra!\n\n`;
-            text += `🆔 Orden: *${order.displayId}*\n`;
-            text += `📅 Fecha: ${new Date(order.createdAt).toLocaleString()}\n`;
-            text += `--------------------------\n`;
-            order.cart.forEach(i => text += `${i.qty}x ${i.name} - C$${(i.price * i.qty).toFixed(2)}\n`);
-            text += `--------------------------\n`;
-            text += `💰 *TOTAL: C$${order.total.toFixed(2)}*\n`;
-            text += `🛵 *Rastreo:* ${trackLink}`;
-            window.open(`https://wa.me/505${phone}?text=${encodeURIComponent(text)}`, '_blank');
+      return (
+        <div>
+          <h2 className="text-2xl font-bold mb-6 text-white">Reportes Financieros</h2>
+          <div className="grid md:grid-cols-4 gap-4">
+            <div className="glass p-4 rounded-xl text-white">
+              <p className="font-bold">Ventas Totales</p>
+              <p className="text-3xl">${metrics.rev.toFixed(2)}</p>
+            </div>
+            <div className="glass p-4 rounded-xl text-white">
+              <p className="font-bold">Ganancia Neta</p>
+              <p className="text-3xl">${metrics.net.toFixed(2)}</p>
+            </div>
+            <div className="glass p-4 rounded-xl text-white">
+              <p className="font-bold">Envíos</p>
+              <p className="text-3xl">${metrics.del.toFixed(2)}</p>
+            </div>
+            <div className="glass p-4 rounded-xl text-white">
+              <p className="font-bold">Items Vendidos</p>
+              <p className="text-3xl">{metrics.items}</p>
+            </div>
+          </div>
+          <h3 className="text-xl font-bold mt-8 mb-4 text-white">Stock Bajo</h3>
+          <div className="space-y-2">
+            {products.filter(p => p.stock <= 5).map(p => (
+              <div key={p.id} className="glass p-3 rounded text-white flex justify-between">
+                <span>{p.name}</span><span className="text-red-300">Stock: {p.stock}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // ==== ABRIR CAJA ====
+    const OpenShift = ({ onOpen, user }) => {
+      const [amount, setAmount] = useState(0);
+      const open = async () => {
+        const ref = await addDoc(collection(db, "shifts"), { userId: user.uid, startAmount: +amount, openedAt: serverTimestamp(), status: "open" });
+        onOpen(user.uid);
+      };
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="glass p-8 rounded-xl max-w-md text-white text-center">
+            <h2 className="text-2xl font-bold mb-4">Abrir Caja</h2>
+            <Input label="Monto Inicial ($)" type="number" value={amount} onChange={e=>setAmount(e.target.value)} />
+            <Button onClick={open} disabled={!amount} className="mt-6 w-full">Abrir</Button>
+          </div>
+        </div>
+      );
+    };
+
+    // ==== CONTROL CAJA (con cierre automático) ====
+    const ShiftControl = ({ shift, onUpdate }) => {
+      const [endAmount, setEndAmount] = useState(0);
+      const close = async () => {
+        if (confirm("¿Cerrar caja?")) {
+          await updateDoc(doc(db, "shifts", shift.id), { status: "closed", endAmount: +endAmount, closedAt: serverTimestamp() });
+          onUpdate();
         }
+      };
+      return (
+        <div>
+          <h2 className="text-2xl font-bold mb-6 text-white">Control de Caja</h2>
+          <div className="glass p-6 rounded-xl text-white">
+            <p>Inicio: ${shift.startAmount}</p>
+            <p>Apertura: {shift.openedAt?.toDate().toLocaleString()}</p>
+            <Input label="Monto Final ($)" type="number" value={endAmount} onChange={e=>setEndAmount(e.target.value)} className="mt-4" />
+            <Button variant="danger" onClick={close} className="mt-6 w-full">Cerrar Caja</Button>
+          </div>
+        </div>
+      );
+    };
 
-        // --- TRACKING ---
-        async function loadTracking(id) {
-            document.getElementById('tracking-screen').classList.remove('hidden');
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'orders', id);
-            
-            onSnapshot(docRef, (snap) => {
-                if(!snap.exists()) {
-                    document.getElementById('track-id').innerText = "Orden No Encontrada";
-                    document.getElementById('track-status-badge').innerText = "ERROR";
-                    return;
-                }
-                const d = snap.data();
-                document.getElementById('track-id').innerText = `ID: ${d.displayId}`;
-                document.getElementById('track-status-badge').innerText = d.status.toUpperCase();
-                
-                const badgeClass = {
-                    'recibido': 'bg-gray-200 text-gray-600',
-                    'proceso': 'bg-blue-100 text-blue-600',
-                    'ruta': 'bg-yellow-100 text-yellow-600',
-                    'entregado': 'bg-green-100 text-green-600',
-                    'cancelado': 'bg-red-100 text-red-600'
-                };
-                document.getElementById('track-status-badge').className = `inline-block px-4 py-1.5 rounded-full text-sm font-black uppercase tracking-wide ${badgeClass[d.status] || 'bg-gray-100'}`;
-                
-                const progMap = { 'recibido': '10%', 'proceso': '50%', 'ruta': '80%', 'entregado': '100%', 'cancelado': '100%' };
-                document.getElementById('track-progress').style.width = progMap[d.status] || '0%';
-                if(d.status === 'cancelado') document.getElementById('track-progress').classList.replace('bg-green-500', 'bg-red-500');
-
-                document.getElementById('track-items').innerHTML = d.cart.map(i => `
-                    <div class="flex justify-between text-sm border-b border-gray-100 pb-2">
-                        <span class="text-gray-600 font-medium">${i.qty}x ${i.name}</span>
-                        <span class="font-bold">C$${(i.price*i.qty).toFixed(2)}</span>
-                    </div>`).join('');
-                
-                document.getElementById('track-delivery').innerText = `C$${d.shipCost.toFixed(2)}`;
-                document.getElementById('track-total').innerText = `C$${d.total.toFixed(2)}`;
-                document.getElementById('track-method').innerText = d.method;
-                document.getElementById('track-client').innerText = d.client;
-                document.getElementById('track-address').innerText = d.isDelivery ? d.address : "Retiro en Tienda";
-            });
-        }
-
-        // --- GESTIÓN ÓRDENES MOBILE ---
-        function renderOrdersListMobile() {
-            const list = document.getElementById('orders-list-mobile');
-            list.innerHTML = orders.map(o => `
-                <div onclick="viewOrder('${o.id}')" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-center active:bg-gray-50 transition cursor-pointer">
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">${o.displayId}</span>
-                            <span class="text-[10px] text-gray-400">${new Date(o.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <p class="font-bold text-sm text-gray-800">${o.client}</p>
-                        <div class="flex gap-1 mt-1">
-                            <span class="status-badge ${o.paymentStatus === 'pagado' ? 'st-paid' : 'st-pending'} text-[9px]">${o.paymentStatus}</span>
-                            <span class="status-badge bg-gray-100 text-gray-500 border border-gray-200 text-[9px]">${o.status}</span>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <span class="block text-sm font-black text-gray-800">C$${o.total.toFixed(2)}</span>
-                        <i data-lucide="chevron-right" class="w-5 h-5 text-gray-300 inline-block mt-2"></i>
-                    </div>
-                </div>
-            `).join('');
-            lucide.createIcons();
-        }
-
-        window.viewOrder = (id) => {
-            selectedOrder = orders.find(x => x.id === id);
-            document.getElementById('modal-order-detail').classList.remove('hidden');
-            
-            document.getElementById('od-id').innerText = `Orden ${selectedOrder.displayId}`;
-            document.getElementById('od-date').innerText = new Date(selectedOrder.createdAt).toLocaleString();
-            document.getElementById('od-status').value = selectedOrder.status;
-            document.getElementById('od-pay-status').value = selectedOrder.paymentStatus || 'pendiente';
-            document.getElementById('od-client').innerText = `${selectedOrder.client}`;
-            document.getElementById('od-seller').innerText = selectedOrder.seller || 'Sistema';
-            document.getElementById('od-total').innerText = `C$${selectedOrder.total.toFixed(2)}`;
-            
-            document.getElementById('od-items').innerHTML = selectedOrder.cart.map(i => `
-                <div class="flex justify-between">
-                    <span class="text-gray-600">${i.qty}x ${i.name}</span>
-                    <span class="font-bold">C$${(i.price * i.qty).toFixed(2)}</span>
-                </div>`).join('');
-        };
-
-        window.updateOrderStatus = async () => {
-            if(!selectedOrder) return;
-            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'orders', selectedOrder.id), {
-                status: document.getElementById('od-status').value,
-                paymentStatus: document.getElementById('od-pay-status').value
-            });
-            showToast("Orden actualizada");
-        };
-
-        window.sendWhatsAppAdmin = () => { if(selectedOrder) sendWhatsApp(selectedOrder); };
-        
-        window.copyTrackingLink = () => {
-             if(selectedOrder) {
-                 const url = `${window.location.origin}${window.location.pathname}?track=${selectedOrder.displayId}`;
-                 const t = document.createElement('input'); 
-                 t.value = url; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); 
-                 showToast("Enlace copiado");
-             }
-        };
-
-        // --- PRODUCTOS ---
-        window.toggleVariantsUI = () => {
-            const has = document.getElementById('has-variants').checked;
-            document.getElementById('simple-fields').classList.toggle('hidden', has);
-            document.getElementById('variants-fields').classList.toggle('hidden', !has);
-            if (!has) document.getElementById('variants-list').innerHTML = '';
-        };
-
-        window.addVariantRow = (variant = {}) => {
-            const div = document.createElement('div');
-            div.className = "flex gap-2 items-center variant-row bg-white p-2 rounded-lg border border-indigo-100 shadow-sm";
-            div.innerHTML = `
-                <input class="bg-gray-50 border p-2 rounded-lg text-xs w-full outline-none focus:ring-1 ring-indigo-300" placeholder="Nombre (Ej. XL)" name="v_name" value="${variant.name || ''}" required>
-                <input class="bg-gray-50 border p-2 rounded-lg text-xs w-20 outline-none text-center" type="number" placeholder="$$$" name="v_price" value="${variant.price || ''}" step="0.01" required>
-                <input class="bg-gray-50 border p-2 rounded-lg text-xs w-16 outline-none text-center" type="number" placeholder="Stk" name="v_stock" value="${variant.stock || ''}" required>
-                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 p-1"><i data-lucide="trash" class="w-4 h-4"></i></button>
-            `;
-            document.getElementById('variants-list').appendChild(div);
-            lucide.createIcons();
-        };
-        
-        document.getElementById('form-product').addEventListener('submit', async(e) => {
-            e.preventDefault();
-            const btn = e.target.querySelector('button[type="submit"]'); // Find via querySelector since requestSubmit was used
-            // No need to disable logic heavily here as modal closes fast, but good practice
-            
-            const f = e.target;
-            const hasVars = document.getElementById('has-variants').checked;
-            let variantsData = [];
-            if(hasVars) {
-                document.querySelectorAll('.variant-row').forEach(r => {
-                    variantsData.push({
-                        name: r.querySelector('[name="v_name"]').value,
-                        price: parseFloat(r.querySelector('[name="v_price"]').value),
-                        stock: parseInt(r.querySelector('[name="v_stock"]').value)
-                    });
-                });
-            }
-            
-            const data = {
-                name: f.name.value,
-                category: f.category.value,
-                image: f.image.value,
-                price: hasVars ? 0 : parseFloat(document.getElementById('prod-price').value),
-                stock: hasVars ? 0 : parseInt(document.getElementById('prod-stock').value),
-                variants: variantsData
-            };
-            
-            const id = document.getElementById('prod-id').value;
-            const col = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-            
-            if(id) await updateDoc(doc(col, id), data);
-            else await addDoc(col, data);
-            
-            closeModal('modal-product');
-            showToast("Producto Guardado");
-        });
-
-        window.deleteProduct = async () => {
-            if(!confirm('¿Eliminar producto?')) return;
-            const id = document.getElementById('prod-id').value;
-            if(id) {
-                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
-                closeModal('modal-product');
-                showToast("Producto Eliminado", 'error');
-            }
-        };
-
-        // --- AUTH ---
-        window.toggleAuthMode = () => {
-            isRegisterMode = !isRegisterMode;
-            const btn = document.getElementById('auth-submit-btn');
-            const toggleBtn = document.getElementById('auth-toggle-btn');
-            const title = document.getElementById('auth-title');
-            
-            if (isRegisterMode) {
-                btn.innerText = "CREAR CUENTA";
-                toggleBtn.innerText = "Cancelar registro";
-                title.innerText = "Registro Admin";
-            } else {
-                btn.innerText = "INICIAR SESIÓN";
-                toggleBtn.innerText = "Crear cuenta nueva";
-                title.innerText = "Acceso POS";
-            }
-            document.getElementById('auth-error').classList.add('hidden');
-            document.getElementById('auth-form').reset();
-        };
-
-        document.getElementById('auth-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('auth-email').value;
-            const pass = document.getElementById('auth-pass').value;
-            const errorEl = document.getElementById('auth-error');
-            errorEl.classList.add('hidden');
-
-            try {
-                if (isRegisterMode) await createUserWithEmailAndPassword(auth, email, pass);
-                else await signInWithEmailAndPassword(auth, email, pass);
-            } catch(e) {
-                let msg = "Error de acceso";
-                if (e.code === 'auth/invalid-email') msg = 'Email inválido';
-                else if (e.code === 'auth/wrong-password') msg = 'Contraseña incorrecta';
-                errorEl.innerText = msg;
-                errorEl.classList.remove('hidden');
-            }
-        });
-
-        window.logout = () => signOut(auth);
-        window.saveUsername = async () => {
-            const name = document.getElementById('setup-username').value;
-            if(!name) return;
-            await updateProfile(auth.currentUser, { displayName: name });
-            location.reload(); 
-        };
-
-        // --- UI UTILS ---
-        window.switchView = (v) => {
-            vibrate();
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById('view-'+v).classList.remove('hidden');
-            
-            // Nav Mobile Styles
-            const activeColor = 'text-indigo-600';
-            const inactiveColor = 'text-gray-400';
-            ['pos', 'orders', 'inventory'].forEach(id => {
-                const btn = document.getElementById('nav-'+id);
-                if(id === v) {
-                    btn.classList.remove(inactiveColor); btn.classList.add(activeColor);
-                } else {
-                    btn.classList.remove(activeColor); btn.classList.add(inactiveColor);
-                }
-            });
-            // Nav Desktop styles
-            if(window.innerWidth >= 768) {
-                document.querySelectorAll('div[class*="absolute"] button').forEach(b => {
-                    b.classList.remove('bg-indigo-50', 'text-indigo-600');
-                    b.classList.add('text-gray-500');
-                });
-                document.getElementById('btn-d-'+v).classList.add('bg-indigo-50', 'text-indigo-600');
-                document.getElementById('btn-d-'+v).classList.remove('text-gray-500');
-            }
-        };
-
-        window.openProductModal = () => {
-            document.getElementById('modal-product').classList.remove('hidden');
-            document.getElementById('form-product').reset();
-            document.getElementById('prod-id').value = '';
-            document.getElementById('variants-list').innerHTML = '';
-            document.getElementById('has-variants').checked = false;
-            document.getElementById('btn-delete-prod').classList.add('hidden');
-            toggleVariantsUI();
-            document.getElementById('prod-modal-title').innerText = "Nuevo Producto";
-        };
-
-        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
-        
-        window.showToast = (msg, type='success') => {
-            const t = document.getElementById('toast-container');
-            const el = document.createElement('div');
-            el.className = `px-6 py-3 rounded-full shadow-2xl text-xs font-bold text-white mb-2 transition-all transform scale-90 opacity-0 ${type === 'error' ? 'bg-red-500' : 'bg-gray-800'}`;
-            el.innerText = msg;
-            t.appendChild(el);
-            setTimeout(() => { el.classList.remove('scale-90', 'opacity-0'); el.classList.add('scale-100', 'opacity-100'); }, 10);
-            setTimeout(() => { el.classList.add('opacity-0', 'translate-y-2'); setTimeout(() => el.remove(), 300); }, 2500);
-        };
-        
-        window.renderInventory = () => {
-            document.getElementById('inventory-list').innerHTML = products.map(p => {
-                const totalStock = p.variants?.length > 0 ? p.variants.reduce((a,b)=>a+parseInt(b.stock),0) : p.stock;
-                return `
-                <tr class="border-b hover:bg-gray-50 cursor-pointer" onclick="editProd('${p.id}')">
-                    <td class="p-3">
-                        <p class="font-bold text-gray-800">${p.name}</p>
-                        <p class="text-xs text-gray-500">
-                             ${p.variants?.length > 0 ? p.variants.length + ' Var.' : 'Simple'} | Stock: <span class="${totalStock<=5?'text-red-500':'text-green-600'} font-bold">${totalStock}</span>
-                        </p>
-                    </td>
-                    <td class="p-3 text-right"><i data-lucide="edit-3" class="w-4 h-4 text-indigo-400 inline"></i></td>
-                </tr>`
-            }).join('');
-            lucide.createIcons();
-        };
-        
-        window.editProd = (id) => {
-             const p = products.find(x => x.id === id);
-             openProductModal();
-             document.getElementById('prod-id').value = p.id;
-             document.querySelector('[name="name"]').value = p.name;
-             document.querySelector('[name="category"]').value = p.category;
-             document.querySelector('[name="image"]').value = p.image || '';
-             document.getElementById('prod-modal-title').innerText = "Editar Producto";
-             document.getElementById('btn-delete-prod').classList.remove('hidden');
-             
-             const has = p.variants && p.variants.length > 0;
-             document.getElementById('has-variants').checked = has;
-             toggleVariantsUI();
-             
-             if(has) p.variants.forEach(v => addVariantRow(v));
-             else {
-                 document.getElementById('prod-price').value = p.price;
-                 document.getElementById('prod-stock').value = p.stock;
-             }
-        };
-
-        window.onload = init;
-    </script>
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
 </body>
 </html>
-
