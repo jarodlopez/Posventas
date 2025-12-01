@@ -11,12 +11,17 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-  <!-- React 18 -->
+  <!-- React 18 UMD -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- ESC/POS for thermal printers (new) -->
+  <!-- Firebase v8 CDN (global namespace) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+  <!-- ESC/POS for thermal printers -->
   <script src="https://unpkg.com/escpos-web@1.0.2/dist/escpos.min.js"></script>
 
   <style>
@@ -29,17 +34,8 @@
 <body>
   <div id="root"></div>
 
-  <script type="text/babel" data-type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import {
-      getFirestore, collection, addDoc, getDocs, updateDoc, increment,
-      doc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp,
-      where, getDoc, writeBatch
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-    import {
-      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, signInAnonymously
-    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
+  <script type="text/babel">
+    // Firebase Config (v8 global)
     const firebaseConfig = {
       apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
       authDomain: "posdeventas-a03ca.firebaseapp.com",
@@ -49,9 +45,9 @@
       appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
     const { useState, useEffect, useMemo, useRef } = React;
 
     // ==== COMPONENTES REUTILIZABLES ====
@@ -108,7 +104,7 @@
           setIsCustomerView(true);
           loadCustomerOrder(orderId);
         } else {
-          const unsubscribe = onAuthStateChanged(auth, async (u) => {
+          const unsubscribe = auth.onAuthStateChanged(async (u) => {
             setUser(u);
             if (u) {
               loadData();
@@ -116,28 +112,27 @@
             }
             setLoading(false);
           });
-          return () => unsubscribe();
+          return unsubscribe;
         }
       }, []);
 
       const loadCustomerOrder = async (id) => {
         try {
-          await signInAnonymously(auth);
-          const docSnap = await getDoc(doc(db, "sales", id));
-          if (docSnap.exists()) setCustomerOrder({ id: docSnap.id, ...docSnap.data(), date: docSnap.data().date?.toDate() });
+          await auth.signInAnonymously();
+          const docSnap = await db.collection("sales").doc(id).get();
+          if (docSnap.exists) setCustomerOrder({ id: docSnap.id, ...docSnap.data(), date: docSnap.data().date?.toDate() });
           else Swal.fire("Error", "Orden no encontrada", "error");
         } catch (e) { console.error(e); }
         setLoading(false);
       };
 
       const loadData = () => {
-        onSnapshot(collection(db, "products"), s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()}))));
-        onSnapshot(query(collection(db, "sales"), orderBy("date", "desc")), s => setSales(s.docs.map(d => ({id:d.id, ...d.data(), date: d.data().date?.toDate()}))));
+        db.collection("products").onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()}))));
+        db.collection("sales").orderBy("date", "desc").onSnapshot(s => setSales(s.docs.map(d => ({id:d.id, ...d.data(), date: d.data().date?.toDate()}))));
       };
 
       const checkShift = async (uid) => {
-        const q = query(collection(db, "shifts"), where("status","==","open"), where("userId","==",uid));
-        const snap = await getDocs(q);
+        const snap = await db.collection("shifts").where("status","==","open").where("userId","==",uid).get();
         setShift(snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() });
       };
 
@@ -170,7 +165,7 @@
             </nav>
             <div className="p-4 border-t border-white/20">
               <p className="hidden lg:block text-sm opacity-90">{user.email}</p>
-              <button onClick={()=>signOut(auth)} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 text-sm">
+              <button onClick={()=>auth.signOut()} className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 text-sm">
                 <Icon name="logout" /> <span className="hidden lg:block">Salir</span>
               </button>
             </div>
@@ -222,7 +217,7 @@
       const [pass, setPass] = useState("");
       const login = (e) => {
         e.preventDefault();
-        signInWithEmailAndPassword(auth, email, pass).catch(() => Swal.fire("Error", "Credenciales incorrectas", "error"));
+        auth.signInWithEmailAndPassword(email, pass).catch(() => Swal.fire("Error", "Credenciales incorrectas", "error"));
       };
       return (
         <div className="min-h-screen flex items-center justify-center p-6">
@@ -291,7 +286,7 @@
         setLoading(true);
         try {
           const sale = {
-            date: serverTimestamp(),
+            date: firebase.firestore.Timestamp.now(),
             shiftId: shift.id,
             cashierId: user.uid,
             items: cart,
@@ -302,16 +297,11 @@
             paymentStatus: method === 'whatsapp' ? 'Pendiente' : 'Pagado',
             method
           };
-          const batch = writeBatch(db);
-          const saleRef = doc(collection(db, "sales"));
-          batch.set(saleRef, sale);
+          const saleRef = await db.collection("sales").add(sale);
 
-          cart.forEach(item => {
-            const prodRef = doc(db, "products", item.id);
-            batch.update(prodRef, { stock: increment(-item.qty) }); // Soporte variantes: actualizaría variant.stock si existiera
+          cart.forEach(async (item) => {
+            await db.collection("products").doc(item.id).update({ stock: firebase.firestore.FieldValue.increment(-item.qty) });
           });
-
-          await batch.commit();
 
           if (method !== 'whatsapp') {
             printTicket(sale);
@@ -394,7 +384,7 @@
 
       const save = async () => {
         if (!form.name) return;
-        await addDoc(collection(db, "products"), { ...form, price: +form.price, cost: +form.cost, stock: +form.stock });
+        await db.collection("products").add({ ...form, price: +form.price, cost: +form.cost, stock: +form.stock });
         setModal(false); setForm({ name:'', price:0, cost:0, stock:0, variants:[] });
       };
 
@@ -405,7 +395,7 @@
       };
 
       const del = async (id) => {
-        if (confirm("¿Eliminar?")) await deleteDoc(doc(db, "products", id));
+        if (confirm("¿Eliminar?")) await db.collection("products").doc(id).delete();
       };
 
       return (
@@ -533,7 +523,7 @@
     const OpenShift = ({ onOpen, user }) => {
       const [amount, setAmount] = useState(0);
       const open = async () => {
-        const ref = await addDoc(collection(db, "shifts"), { userId: user.uid, startAmount: +amount, openedAt: serverTimestamp(), status: "open" });
+        const ref = await db.collection("shifts").add({ userId: user.uid, startAmount: +amount, openedAt: firebase.firestore.FieldValue.serverTimestamp(), status: "open" });
         onOpen(user.uid);
       };
       return (
@@ -552,7 +542,7 @@
       const [endAmount, setEndAmount] = useState(0);
       const close = async () => {
         if (confirm("¿Cerrar caja?")) {
-          await updateDoc(doc(db, "shifts", shift.id), { status: "closed", endAmount: +endAmount, closedAt: serverTimestamp() });
+          await db.collection("shifts").doc(shift.id).update({ status: "closed", endAmount: +endAmount, closedAt: firebase.firestore.FieldValue.serverTimestamp() });
           onUpdate();
         }
       };
