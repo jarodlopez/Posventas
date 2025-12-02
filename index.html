@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#4338ca">
 
   <!-- ==========================================
-       LIBRERÍAS (NO TOCAR)
+       LIBRERÍAS
        ========================================== -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -15,13 +15,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-  
-  <!-- REACT CORE -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- FIREBASE -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -64,22 +60,12 @@
     .btn:active { transform: scale(0.96); }
     .btn-primary { background: #4f46e5; color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
     
-    /* Animaciones */
     @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-enter { animation: enter 0.3s ease-out forwards; }
     
-    /* Menu Lateral */
-    .drawer {
-        position: fixed; inset: 0; z-index: 100; pointer-events: none;
-    }
-    .drawer-overlay {
-        position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s;
-    }
-    .drawer-content {
-        position: absolute; top: 0; left: 0; bottom: 0; width: 80%; max-width: 300px;
-        background: white; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        pointer-events: auto; display: flex; flex-direction: column;
-    }
+    .drawer { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+    .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; }
+    .drawer-content { position: absolute; top: 0; left: 0; bottom: 0; width: 80%; max-width: 300px; background: white; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: auto; display: flex; flex-direction: column; }
     .drawer.open { pointer-events: auto; }
     .drawer.open .drawer-overlay { opacity: 1; }
     .drawer.open .drawer-content { transform: translateX(0); }
@@ -89,7 +75,6 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    // --- FIREBASE INIT ---
     const firebaseConfig = {
       apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
       authDomain: "posdeventas-a03ca.firebaseapp.com",
@@ -107,7 +92,6 @@
 
     const { useState, useEffect } = React;
 
-    // --- ICONOS ---
     const Icon = ({ name, size = 20, className = "" }) => {
       useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
       return <i data-lucide={name} width={size} height={size} className={className}></i>;
@@ -115,7 +99,7 @@
 
     const formatMoney = (amount) => new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'NIO' }).format(amount).replace('NIO', 'C$');
 
-    // --- RASTREO ---
+    // --- TRACKING VIEW ---
     const TrackingView = ({ trackId }) => {
       const [order, setOrder] = useState(null);
       const [loading, setLoading] = useState(true);
@@ -168,10 +152,7 @@
                        <div key={idx} className="flex justify-between items-start text-sm">
                           <div className="flex gap-3">
                              <span className="font-bold text-slate-500 bg-slate-100 px-2 rounded h-fit">{item.qty}x</span>
-                             <div>
-                                <p className="font-bold text-slate-700">{item.name}</p>
-                                {item.variantName && <p className="text-xs text-slate-400">{item.variantName}</p>}
-                             </div>
+                             <div><p className="font-bold text-slate-700">{item.name}</p>{item.variantName && <p className="text-xs text-slate-400">{item.variantName}</p>}</div>
                           </div>
                           <span className="font-bold text-slate-800">{formatMoney(item.price * item.qty)}</span>
                        </div>
@@ -184,7 +165,6 @@
                     {order.isDelivery && <div className="flex justify-between text-indigo-600 font-bold"><span>Envío</span><span>{formatMoney(order.shipCost)}</span></div>}
                     <div className="flex justify-between text-xl font-black text-slate-900 border-t pt-2 mt-2"><span>Total</span><span>{formatMoney(order.total)}</span></div>
                  </div>
-
                  <div className="text-center pt-2 border-t border-slate-100">
                     <p className="text-xs text-slate-400 uppercase font-bold mb-1">Entregar a:</p>
                     <p className="text-sm font-bold text-slate-800">{order.client || 'Cliente'}</p>
@@ -202,21 +182,15 @@
       const [pass, setPass] = useState("");
       const [error, setError] = useState("");
       const [loading, setLoading] = useState(false);
-
       const doLogin = async (e) => {
          e.preventDefault(); setLoading(true); setError("");
          try { await auth.signInWithEmailAndPassword(email, pass); }
          catch(e) { setError("Credenciales incorrectas"); setLoading(false); }
       };
-
       return (
          <div className="h-full flex items-center justify-center bg-slate-900 px-4">
             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8 animate-enter">
-               <div className="text-center mb-8">
-                  <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-700"><Icon name="store" size={32}/></div>
-                  <h1 className="text-3xl font-black text-slate-800 tracking-tighter">HOMEMART</h1>
-                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Acceso Administrativo</p>
-               </div>
+               <div className="text-center mb-8"><div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-700"><Icon name="store" size={32}/></div><h1 className="text-3xl font-black text-slate-800 tracking-tighter">HOMEMART</h1><p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Acceso Administrativo</p></div>
                <form onSubmit={doLogin} className="space-y-4">
                   <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Usuario</label><input type="email" className="input-field mt-1" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
                   <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Contraseña</label><input type="password" className="input-field mt-1" value={pass} onChange={e=>setPass(e.target.value)} required /></div>
@@ -228,7 +202,7 @@
       );
     };
 
-    // --- MODULO ADMIN (REPORTES REPARADO) ---
+    // --- ADMIN MODULE ---
     const AdminModule = ({ user, shift, updateShift }) => {
        const [tab, setTab] = useState('shift'); 
        const [startAmt, setStartAmt] = useState("");
@@ -237,27 +211,14 @@
 
        const openS = async () => { if(startAmt) { await getCollection('shifts').add({userId:user.uid, startAmount:parseFloat(startAmt), openedAt: firebase.firestore.FieldValue.serverTimestamp(), status:'open'}); updateShift(); Swal.fire("Caja Abierta", "", "success"); }};
        const closeS = async () => { if((await Swal.fire({title:'¿Cerrar Turno?', icon:"warning", showCancelButton:true, confirmButtonColor:"#ef4444"})).isConfirmed) { await getCollection('shifts').doc(shift.id).update({status:'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp()}); updateShift(); Swal.fire("Turno Cerrado", "", "success"); }};
-       
        const report = async (type) => {
           try {
              const sd = new Date(d1); const ed = new Date(d2); ed.setHours(23,59,59,999);
              const snap = await getCollection('orders').where('createdAt','>=',sd.toISOString()).where('createdAt','<=',ed.toISOString()).get();
              const data = snap.docs.map(d=>{const x=d.data(); return [x.displayId, new Date(x.createdAt).toLocaleDateString(), x.client || 'Anon', x.method, x.total.toFixed(2)]});
              if(data.length===0) return Swal.fire("Sin datos", "", "info");
-             
-             if(type==='pdf') { 
-                 // Aseguramos acceso a librería cargada
-                 const { jsPDF } = window.jspdf;
-                 const doc = new jsPDF(); 
-                 doc.text(`Reporte: ${d1} a ${d2}`, 14, 20); 
-                 doc.autoTable({head:[['ID','Fecha','Cliente','Método','Total']], body:data, startY:30}); 
-                 doc.save(`ventas.pdf`); 
-             } else { 
-                 const ws = XLSX.utils.aoa_to_sheet([['ID','Fecha','Cliente','Método','Total'], ...data]); 
-                 const wb=XLSX.utils.book_new(); 
-                 XLSX.utils.book_append_sheet(wb, ws, "Ventas"); 
-                 XLSX.writeFile(wb, `ventas.xlsx`); 
-             }
+             if(type==='pdf') { const doc = new window.jspdf.jsPDF(); doc.text(`Reporte: ${d1} a ${d2}`, 14, 20); doc.autoTable({head:[['ID','Fecha','Cliente','Método','Total']], body:data, startY:30}); doc.save(`ventas.pdf`); } 
+             else { const ws = XLSX.utils.aoa_to_sheet([['ID','Fecha','Cliente','Método','Total'], ...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ventas"); XLSX.writeFile(wb, `ventas.xlsx`); }
           } catch(e) { console.error(e); Swal.fire("Error", "Error al generar reporte", "error"); }
        };
 
@@ -269,9 +230,7 @@
                      <button onClick={()=>setTab('reports')} className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${tab==='reports'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Reportes</button>
                  </div>
              </div>
-             
              <div className="scroll-area p-6 flex flex-col items-center justify-start pt-10">
-                {/* PANEL CAJA */}
                 {tab === 'shift' && (
                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center border border-slate-200 animate-enter">
                       <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${shift?'bg-green-100 text-green-600':'bg-slate-100 text-slate-400'}`}><Icon name={shift?'unlock':'lock'} size={32}/></div>
@@ -280,8 +239,6 @@
                       : (<div className="space-y-4"><div className="relative"><span className="absolute left-4 top-3.5 text-slate-400 font-bold">C$</span><input type="number" className="w-full bg-slate-50 pl-10 pr-4 py-3 rounded-xl border-2 border-slate-200 outline-none text-xl font-bold text-center" placeholder="0.00" value={startAmt} onChange={e => setStartAmt(e.target.value)} /></div><button onClick={openS} disabled={!startAmt} className="btn btn-primary w-full py-3.5">ABRIR TURNO</button></div>)}
                    </div>
                 )}
-                
-                {/* PANEL REPORTES */}
                 {tab === 'reports' && (
                    <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 space-y-6 animate-enter">
                       <div className="flex items-center gap-3 text-indigo-700 font-bold text-lg border-b pb-4"><div className="p-2 bg-indigo-50 rounded-lg"><Icon name="file-text" size={24}/></div> Exportar Ventas</div>
@@ -317,13 +274,15 @@
       const [disc, setDisc] = useState(0);
       const [taxOn, setTaxOn] = useState(false);
 
-      // Inventory
+      // Inv
       const [invModal, setInvModal] = useState(false);
       const [invEdit, setInvEdit] = useState(null);
       const [invForm, setInvForm] = useState({ name:'', sku:'', cat:'', img:'', price:'', stock:'', hasVars:false });
       const [invVars, setInvVars] = useState([]);
 
-      // URL Track
+      // Order Detail
+      const [viewOrderId, setViewOrderId] = useState(null);
+
       const trackId = new URLSearchParams(window.location.search).get('track');
 
       useEffect(() => {
@@ -374,47 +333,32 @@
       return (
         <div className="flex h-full w-full bg-slate-100 overflow-hidden relative">
           
-          {/* MENU DRAWER */}
           <div className={`drawer ${menuOpen ? 'open' : ''}`}>
              <div className="drawer-overlay" onClick={()=>setMenuOpen(false)}></div>
              <div className="drawer-content shadow-2xl">
-                 <div className="p-6 bg-indigo-900 text-white">
-                     <h2 className="text-2xl font-black">HOMEMART</h2>
-                     <p className="text-xs opacity-70 mt-1">{user.email}</p>
-                 </div>
+                 <div className="p-6 bg-indigo-900 text-white"><h2 className="text-2xl font-black">HOMEMART</h2><p className="text-xs opacity-70 mt-1">{user.email}</p></div>
                  <div className="flex-1 p-4 space-y-2 overflow-y-auto">
                      <button onClick={()=>{setView('pos'); setMenuOpen(false)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold ${view==='pos'?'bg-indigo-50 text-indigo-600':'text-slate-600 hover:bg-slate-50'}`}><Icon name="store"/> Punto de Venta</button>
                      <button onClick={()=>{setView('inv'); setMenuOpen(false)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold ${view==='inv'?'bg-indigo-50 text-indigo-600':'text-slate-600 hover:bg-slate-50'}`}><Icon name="package"/> Inventario</button>
                      <button onClick={()=>{setView('admin'); setMenuOpen(false)}} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold ${view==='admin'?'bg-indigo-50 text-indigo-600':'text-slate-600 hover:bg-slate-50'}`}><Icon name="settings"/> Administración</button>
                  </div>
-                 <div className="p-4 border-t">
-                     <button onClick={()=>auth.signOut()} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-500 hover:bg-red-50"><Icon name="log-out"/> Cerrar Sesión</button>
-                 </div>
+                 <div className="p-4 border-t"><button onClick={()=>auth.signOut()} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-red-500 hover:bg-red-50"><Icon name="log-out"/> Cerrar Sesión</button></div>
              </div>
           </div>
 
           <main className="flex-1 flex flex-col h-full relative">
              <div className="bg-white p-3 border-b border-slate-200 flex justify-between items-center shrink-0 z-20 shadow-sm">
-                 <div className="flex items-center gap-3">
-                     <button onClick={()=>setMenuOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg"><Icon name="menu" size={24} className="text-indigo-600"/></button>
-                     <span className="font-black text-indigo-900 text-lg tracking-tight">HOMEMART</span>
-                 </div>
-                 <div className="flex items-center gap-2">
-                     {shift ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-200">CAJA ABIERTA</span> : <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full border border-red-200">CERRADO</span>}
-                 </div>
+                 <div className="flex items-center gap-3"><button onClick={()=>setMenuOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg"><Icon name="menu" size={24} className="text-indigo-600"/></button><span className="font-black text-indigo-900 text-lg tracking-tight">HOMEMART</span></div>
+                 <div className="flex items-center gap-2">{shift ? <span className="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded-full border border-green-200">CAJA ABIERTA</span> : <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-full border border-red-200">CERRADO</span>}</div>
              </div>
 
              <div className="flex-1 relative overflow-hidden bg-slate-50">
                 {view === 'pos' && (
                   <div className="h-full flex flex-col">
                      <div className="p-4 flex gap-3 z-10">
-                        <div className="relative flex-1">
-                           <div className="absolute left-3 top-3 text-slate-400"><Icon name="search" size={20}/></div>
-                           <input className="w-full bg-white pl-10 pr-4 py-3 rounded-xl shadow-sm border border-slate-200 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500" placeholder="Buscar por Nombre o SKU..." value={search} onChange={e=>setSearch(e.target.value)}/>
-                        </div>
+                        <div className="relative flex-1"><div className="absolute left-3 top-3 text-slate-400"><Icon name="search" size={20}/></div><input className="w-full bg-white pl-10 pr-4 py-3 rounded-xl shadow-sm border border-slate-200 outline-none font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500" placeholder="Buscar por Nombre o SKU..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
                         <select className="bg-white px-4 rounded-xl shadow-sm border border-slate-200 font-bold text-slate-600 outline-none w-28" value={cat} onChange={e=>setCat(e.target.value)}><option value="">Todo</option>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select>
                      </div>
-
                      <div className="scroll-area px-4 pb-32">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                            {filteredProds.map(p => {
@@ -423,78 +367,47 @@
                               const price = hasVars ? p.variants[0].price : p.price;
                               const noStock = stock <= 0;
                               return (
-                                 <div key={p.id} onClick={() => !noStock && (hasVars ? setSelProd(p) : addToCart(p))} 
-                                    className={`bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative active:scale-95 transition-transform ${noStock?'opacity-60 grayscale':''}`}>
-                                    <div className="h-32 bg-slate-50 rounded-xl mb-3 overflow-hidden flex items-center justify-center relative">
-                                       {p.image ? <img src={p.image} className="w-full h-full object-cover"/> : <Icon name="package" size={40} className="text-slate-300"/>}
-                                       {p.sku && <span className="absolute top-1 left-1 bg-white/90 text-slate-500 text-[9px] font-mono px-1 rounded border border-slate-200">{p.sku}</span>}
-                                       {noStock && <span className="absolute inset-0 flex items-center justify-center bg-white/60 font-black text-red-500 border-2 border-red-500 rounded-lg m-6 -rotate-12">AGOTADO</span>}
-                                    </div>
-                                    <div className="flex-1 flex flex-col justify-between">
-                                       <h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{p.name}</h3>
-                                       <div className="flex justify-between items-end">
-                                          <span className="text-base font-black text-indigo-600">{formatMoney(price)}</span>
-                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${stock<5?'bg-orange-100 text-orange-600':'bg-green-100 text-green-600'}`}>{stock} un.</span>
-                                       </div>
-                                    </div>
+                                 <div key={p.id} onClick={() => !noStock && (hasVars ? setSelProd(p) : addToCart(p))} className={`bg-white p-3 rounded-2xl shadow-sm border border-slate-200 flex flex-col relative active:scale-95 transition-transform ${noStock?'opacity-60 grayscale':''}`}>
+                                    <div className="h-32 bg-slate-50 rounded-xl mb-3 overflow-hidden flex items-center justify-center relative">{p.image ? <img src={p.image} className="w-full h-full object-cover"/> : <Icon name="package" size={40} className="text-slate-300"/>}{p.sku && <span className="absolute top-1 left-1 bg-white/90 text-slate-500 text-[9px] font-mono px-1 rounded border border-slate-200">{p.sku}</span>}{noStock && <span className="absolute inset-0 flex items-center justify-center bg-white/60 font-black text-red-500 border-2 border-red-500 rounded-lg m-6 -rotate-12">AGOTADO</span>}</div>
+                                    <div className="flex-1 flex flex-col justify-between"><h3 className="font-bold text-slate-800 text-sm leading-tight mb-1">{p.name}</h3><div className="flex justify-between items-end"><span className="text-base font-black text-indigo-600">{formatMoney(price)}</span><span className={`text-[10px] font-bold px-2 py-0.5 rounded ${stock<5?'bg-orange-100 text-orange-600':'bg-green-100 text-green-600'}`}>{stock} un.</span></div></div>
                                  </div>
                               );
                            })}
                         </div>
                      </div>
-                     
-                     {/* BOTONES FLOTANTES SUBIDOS (BOTTOM-24) */}
                      <div className="absolute bottom-24 right-5 flex flex-col gap-4 z-30">
-                        <button onClick={()=>setView('orders')} className="bg-orange-500 text-white p-3.5 rounded-full shadow-xl shadow-orange-200 active:scale-90 relative">
-                           <Icon name="list-ordered" size={24}/>
-                           {pendingCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{pendingCount}</span>}
-                        </button>
-                        <button onClick={()=>setShowMobileCart(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-2xl shadow-indigo-300 active:scale-90 relative">
-                           <Icon name="shopping-cart" size={24}/>
-                           {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.reduce((a,b)=>a+b.qty,0)}</span>}
-                        </button>
+                        <button onClick={()=>setView('orders')} className="bg-orange-500 text-white p-3.5 rounded-full shadow-xl shadow-orange-200 active:scale-90 relative"><Icon name="list-ordered" size={24}/>{pendingCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{pendingCount}</span>}</button>
+                        <button onClick={()=>setShowMobileCart(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-2xl shadow-indigo-300 active:scale-90 relative"><Icon name="shopping-cart" size={24}/>{cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.reduce((a,b)=>a+b.qty,0)}</span>}</button>
                      </div>
                   </div>
                 )}
-
                 {view === 'orders' && (
                    <div className="h-full flex flex-col">
                       <div className="p-4 bg-white border-b shrink-0"><h2 className="text-xl font-bold flex gap-2 items-center"><Icon name="list"/> Órdenes</h2></div>
                       <div className="scroll-area p-4 space-y-3 pb-24">
                          {orders.map(o => (
-                            <div key={o.id} className={`p-4 rounded-xl border shadow-sm flex justify-between items-center bg-white ${o.paymentStatus==='pendiente'?'border-l-4 border-l-red-500':''}`}>
+                            // FIX: Added onClick back to Order Card
+                            <div key={o.id} onClick={()=>setViewOrderId(o.id)} className={`p-4 rounded-xl border shadow-sm flex justify-between items-center bg-white cursor-pointer active:scale-95 transition-all ${o.paymentStatus==='pendiente'?'border-l-4 border-l-red-500':''}`}>
                                <div>
                                   <div className="flex gap-2 items-center mb-1"><span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 rounded">{o.displayId}</span><span className={`text-[9px] font-bold px-1.5 rounded uppercase ${o.paymentStatus==='pagado'?'text-green-600 bg-green-50':'text-red-600 bg-red-50'}`}>{o.paymentStatus}</span></div>
                                   <p className="font-bold text-sm text-slate-800">{o.client}</p>
                                   <div className="flex gap-2 mt-1"><span className="text-[10px] text-slate-400">{new Date(o.createdAt).toLocaleDateString()}</span><span className="text-[9px] uppercase font-bold px-1.5 rounded bg-slate-100 text-slate-500">{o.status}</span></div>
                                </div>
-                               <div className="text-right"><span className="block font-black text-lg text-slate-800">{formatMoney(o.total)}</span></div>
+                               <div className="text-right"><span className="block font-black text-lg text-slate-800">{formatMoney(o.total)}</span><Icon name="chevron-right" size={16} className="text-slate-300 ml-auto"/></div>
                             </div>
                          ))}
                       </div>
                    </div>
                 )}
-
                 {view === 'inv' && (
                    <div className="h-full flex flex-col">
-                      <div className="p-4 bg-white border-b shrink-0 flex justify-between items-center">
-                         <h2 className="text-xl font-bold flex gap-2 items-center"><Icon name="package"/> Inventario</h2>
-                         <button onClick={()=>{setInvEdit(null); setInvForm({name:'',sku:'',cat:'',img:'',price:'',stock:'',hasVars:false}); setInvVars([]); setInvModal(true);}} className="btn btn-primary py-2 px-3 text-xs">+ Nuevo</button>
-                      </div>
+                      <div className="p-4 bg-white border-b shrink-0 flex justify-between items-center"><h2 className="text-xl font-bold flex gap-2 items-center"><Icon name="package"/> Inventario</h2><button onClick={()=>{setInvEdit(null); setInvForm({name:'',sku:'',cat:'',img:'',price:'',stock:'',hasVars:false}); setInvVars([]); setInvModal(true);}} className="btn btn-primary py-2 px-3 text-xs">+ Nuevo</button></div>
                       <div className="scroll-area p-4 space-y-2 pb-24">
                          {products.map(p => {
                             const stock = p.variants?.length ? p.variants.reduce((a,b)=>a+Number(b.stock),0) : Number(p.stock);
                             return (
-                               <div key={p.id} onClick={()=>{
-                                  setInvEdit(p); setInvForm({name:p.name, sku:p.sku||'', cat:p.category, img:p.image||'', price:p.price, stock:p.stock, hasVars:!!p.variants?.length}); setInvVars(p.variants||[]); setInvModal(true);
-                               }} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center cursor-pointer hover:bg-slate-50">
-                                  <div className="flex gap-3 items-center">
-                                     <div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200">{p.image?<img src={p.image} className="w-full h-full object-cover"/>:<Icon name="box" className="text-slate-300"/>}</div>
-                                     <div>
-                                        <p className="font-bold text-sm text-slate-800">{p.name}</p>
-                                        <div className="flex gap-2 items-center mt-0.5"><span className="text-[10px] font-mono text-slate-500">{p.sku || 'SIN SKU'}</span><span className={`text-[10px] font-bold ${stock<5?'text-red-500':'text-green-600'}`}>Stock: {stock}</span></div>
-                                     </div>
-                                  </div>
+                               <div key={p.id} onClick={()=>{setInvEdit(p); setInvForm({name:p.name, sku:p.sku||'', cat:p.category, img:p.image||'', price:p.price, stock:p.stock, hasVars:!!p.variants?.length}); setInvVars(p.variants||[]); setInvModal(true);}} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center cursor-pointer hover:bg-slate-50">
+                                  <div className="flex gap-3 items-center"><div className="w-10 h-10 bg-slate-100 rounded-lg overflow-hidden flex items-center justify-center border border-slate-200">{p.image?<img src={p.image} className="w-full h-full object-cover"/>:<Icon name="box" className="text-slate-300"/>}</div><div><p className="font-bold text-sm text-slate-800">{p.name}</p><div className="flex gap-2 items-center mt-0.5"><span className="text-[10px] font-mono text-slate-500">{p.sku || 'SIN SKU'}</span><span className={`text-[10px] font-bold ${stock<5?'text-red-500':'text-green-600'}`}>Stock: {stock}</span></div></div></div>
                                   <Icon name="edit-3" size={16} className="text-slate-300"/>
                                </div>
                             );
@@ -502,68 +415,27 @@
                       </div>
                    </div>
                 )}
-
                 {view === 'admin' && (
                    <AdminModule user={user} shift={shift} updateShift={()=>checkShift(user.uid)} />
                 )}
              </div>
           </main>
 
-          {/* SIDEBAR CARRITO */}
           <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col h-full ${showMobileCart?'translate-x-0':'translate-x-full'}`}>
-             <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
-                <div className="flex items-center gap-2 font-bold text-slate-800"><Icon name="shopping-cart" className="text-indigo-600"/> <span>Carrito ({cart.length})</span></div>
-                <div className="flex gap-2">
-                   <button onClick={clearCart} className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg">LIMPIAR</button>
-                   <button onClick={()=>setShowMobileCart(false)} className="p-1.5 bg-slate-200 rounded-full"><Icon name="x" size={18}/></button>
-                </div>
-             </div>
+             <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0"><div className="flex items-center gap-2 font-bold text-slate-800"><Icon name="shopping-cart" className="text-indigo-600"/> <span>Carrito ({cart.length})</span></div><div className="flex gap-2"><button onClick={clearCart} className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg">LIMPIAR</button><button onClick={()=>setShowMobileCart(false)} className="p-1.5 bg-slate-200 rounded-full"><Icon name="x" size={18}/></button></div></div>
              <div className="scroll-area p-3 space-y-3 pb-32">
                 {cart.length===0 ? <div className="h-full flex flex-col items-center justify-center text-slate-300 gap-3"><Icon name="shopping-basket" size={64}/><p className="font-bold">Vacío</p></div> : 
-                   cart.map(item => (
-                      <div key={item.cartId} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-                         <div className="flex-1 pr-3 overflow-hidden">
-                            <p className="font-bold text-sm text-slate-800 truncate">{item.name}</p>
-                            <div className="flex gap-2 text-xs text-slate-500 mt-0.5"><span>{item.variantName || 'Std'}</span>•<span>{formatMoney(item.price)}</span></div>
-                         </div>
-                         <div className="flex items-center gap-3">
-                            <div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 h-8">
-                               <button onClick={()=>updateQty(item.cartId, -1)} className="px-2.5 h-full text-slate-500 font-bold">-</button>
-                               <span className="w-6 text-center text-sm font-bold">{item.qty}</span>
-                               <button onClick={()=>updateQty(item.cartId, 1)} className="px-2.5 h-full text-indigo-600 font-bold">+</button>
-                            </div>
-                            <span className="font-bold text-sm w-16 text-right">{formatMoney(item.price*item.qty)}</span>
-                         </div>
-                      </div>
-                   ))
+                   cart.map(item => (<div key={item.cartId} className="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm"><div className="flex-1 pr-3 overflow-hidden"><p className="font-bold text-sm text-slate-800 truncate">{item.name}</p><div className="flex gap-2 text-xs text-slate-500 mt-0.5"><span>{item.variantName || 'Std'}</span>•<span>{formatMoney(item.price)}</span></div></div><div className="flex items-center gap-3"><div className="flex items-center bg-slate-50 rounded-lg border border-slate-200 h-8"><button onClick={()=>updateQty(item.cartId, -1)} className="px-2.5 h-full text-slate-500 font-bold">-</button><span className="w-6 text-center text-sm font-bold">{item.qty}</span><button onClick={()=>updateQty(item.cartId, 1)} className="px-2.5 h-full text-indigo-600 font-bold">+</button></div><span className="font-bold text-sm w-16 text-right">{formatMoney(item.price*item.qty)}</span></div></div>))
                 }
              </div>
-             <div className="p-5 bg-white border-t shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20 shrink-0 pb-safe">
-                <div className="flex gap-3 mb-4">
-                   <div className="flex-1 relative bg-slate-50 rounded-lg border border-slate-200 flex items-center overflow-hidden h-10"><span className="pl-3 text-xs font-bold text-slate-400">Desc%</span><input type="number" min="0" max="100" className="w-full h-full px-2 text-sm font-bold bg-transparent outline-none text-center" value={disc} onChange={e=>setDisc(Math.min(100,Math.max(0,e.target.value)))}/></div>
-                   <button onClick={()=>setTaxOn(!taxOn)} className={`flex-1 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-2 ${taxOn?'bg-indigo-50 text-indigo-700 border-indigo-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{taxOn?<Icon name="check-square" size={16}/>:<Icon name="square" size={16}/>} IVA 15%</button>
-                </div>
-                <div className="space-y-2 text-sm mb-4">
-                   <div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatMoney(subtotal)}</span></div>
-                   {disc > 0 && <div className="flex justify-between text-green-600 font-bold"><span>Desc {disc}%</span><span>-{formatMoney(discAmt)}</span></div>}
-                   <div className={`flex justify-between ${taxOn?'text-indigo-600 font-bold':'text-slate-400'}`}><span>IVA 15%</span><span>{formatMoney(tax)}</span></div>
-                   <div className="flex justify-between text-xl font-black text-slate-900 border-t pt-2 mt-1"><span>Total</span><span>{formatMoney(total)}</span></div>
-                </div>
-                <button onClick={()=>setShowCheckout(true)} disabled={cart.length===0} className="btn btn-primary w-full py-3.5 text-base shadow-lg shadow-indigo-200">COBRAR <Icon name="arrow-right" size={20}/></button>
-             </div>
+             <div className="p-5 bg-white border-t shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-20 shrink-0 pb-safe"><div className="flex gap-3 mb-4"><div className="flex-1 relative bg-slate-50 rounded-lg border border-slate-200 flex items-center overflow-hidden h-10"><span className="pl-3 text-xs font-bold text-slate-400">Desc%</span><input type="number" min="0" max="100" className="w-full h-full px-2 text-sm font-bold bg-transparent outline-none text-center" value={disc} onChange={e=>setDisc(Math.min(100,Math.max(0,e.target.value)))}/></div><button onClick={()=>setTaxOn(!taxOn)} className={`flex-1 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-2 ${taxOn?'bg-indigo-50 text-indigo-700 border-indigo-200':'bg-slate-50 text-slate-500 border-slate-200'}`}>{taxOn?<Icon name="check-square" size={16}/>:<Icon name="square" size={16}/>} IVA 15%</button></div><div className="space-y-2 text-sm mb-4"><div className="flex justify-between text-slate-500"><span>Subtotal</span><span>{formatMoney(subtotal)}</span></div>{disc > 0 && <div className="flex justify-between text-green-600 font-bold"><span>Desc {disc}%</span><span>-{formatMoney(discAmt)}</span></div>}<div className={`flex justify-between ${taxOn?'text-indigo-600 font-bold':'text-slate-400'}`}><span>IVA 15%</span><span>{formatMoney(tax)}</span></div><div className="flex justify-between text-xl font-black text-slate-900 border-t pt-2 mt-1"><span>Total</span><span>{formatMoney(total)}</span></div></div><button onClick={()=>setShowCheckout(true)} disabled={cart.length===0} className="btn btn-primary w-full py-3.5 text-base shadow-lg shadow-indigo-200">COBRAR <Icon name="arrow-right" size={20}/></button></div>
           </div>
 
-          {/* MODAL INVENTARIO (CON SKU) */}
           {invModal && (
              <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-enter">
                 <div className="bg-white w-full max-w-lg rounded-2xl flex flex-col max-h-[90vh] overflow-hidden shadow-2xl">
                    <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0"><h3 className="font-bold text-lg text-slate-800">{invEdit?'Editar':'Nuevo'}</h3><button onClick={()=>setInvModal(false)}><Icon name="x"/></button></div>
-                   <form onSubmit={async(e)=>{
-                      e.preventDefault();
-                      const d = { name: invForm.name, sku: invForm.sku, category: invForm.cat, image: invForm.img, price: invForm.hasVars?0:Number(invForm.price), stock: invForm.hasVars?0:Number(invForm.stock), variants: invForm.hasVars?invVars.map(v=>({name:v.name,price:Number(v.price),stock:Number(v.stock)})):[] };
-                      if(invEdit) await getCollection('products').doc(invEdit.id).update(d); else await getCollection('products').add(d);
-                      setInvModal(false); Swal.fire({toast:true,title:"Guardado",icon:"success",timer:1500,position:'top',showConfirmButton:false});
-                   }} className="scroll-area p-6 space-y-5 bg-white pb-40">
+                   <form onSubmit={async(e)=>{e.preventDefault(); const d = { name: invForm.name, sku: invForm.sku, category: invForm.cat, image: invForm.img, price: invForm.hasVars?0:Number(invForm.price), stock: invForm.hasVars?0:Number(invForm.stock), variants: invForm.hasVars?invVars.map(v=>({name:v.name,price:Number(v.price),stock:Number(v.stock)})):[] }; if(invEdit) await getCollection('products').doc(invEdit.id).update(d); else await getCollection('products').add(d); setInvModal(false); Swal.fire({toast:true,title:"Guardado",icon:"success",timer:1500,position:'top',showConfirmButton:false});}} className="scroll-area p-6 space-y-5 bg-white pb-40">
                       <div><label className="text-xs font-bold text-slate-400 uppercase">Nombre</label><input className="input-field mt-1" value={invForm.name} onChange={e=>setInvForm({...invForm,name:e.target.value})} required/></div>
                       <div className="grid grid-cols-2 gap-4"><div><label className="text-xs font-bold text-slate-400 uppercase">SKU / Código</label><input className="input-field mt-1 font-mono uppercase" value={invForm.sku} onChange={e=>setInvForm({...invForm,sku:e.target.value})} placeholder="CODE-123"/></div><div><label className="text-xs font-bold text-slate-400 uppercase">Categoría</label><input className="input-field mt-1" list="cats" value={invForm.cat} onChange={e=>setInvForm({...invForm,cat:e.target.value})}/><datalist id="cats"><option value="Ropa"/><option value="Tecnología"/><option value="Hogar"/></datalist></div></div>
                       <div><label className="text-xs font-bold text-slate-400 uppercase">Imagen URL</label><input className="input-field mt-1" value={invForm.img} onChange={e=>setInvForm({...invForm,img:e.target.value})}/></div>
@@ -576,10 +448,46 @@
              </div>
           )}
 
-          {/* MODAL CHECKOUT */}
           {showCheckout && <CheckoutModal cart={cart} totals={{subtotal, discAmt, disc, tax, taxOn, total}} onClose={()=>setShowCheckout(false)} onSuccess={()=>{clearCart(); setShowCheckout(false); setShowMobileCart(false); setDisc(0);}} shift={shift}/>}
 
-          {/* MODAL VARIANTES SELECT POS */}
+          {/* MODAL ORDER DETAIL (FIXED) */}
+          {viewOrderId && (() => {
+             const o = orders.find(x => x.id === viewOrderId);
+             if(!o) return null;
+             return (
+               <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-enter">
+                  <div className="bg-white w-full max-w-md rounded-2xl flex flex-col max-h-[90vh] overflow-hidden shadow-2xl">
+                     <div className="p-4 border-b bg-slate-50 flex justify-between items-center shrink-0"><div><h3 className="font-bold text-lg">{o.displayId}</h3><p className="text-xs text-slate-500">{new Date(o.createdAt).toLocaleString()}</p></div><button onClick={()=>setViewOrderId(null)} className="p-1 hover:bg-slate-200 rounded-full"><Icon name="x"/></button></div>
+                     <div className="scroll-area p-5 bg-white space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
+                           <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Estado</label><select className="w-full border rounded-lg p-2 text-xs font-bold bg-slate-50" value={o.status} onChange={async(e)=>{await getCollection('orders').doc(o.id).update({status:e.target.value})}}><option value="recibido">Recibido</option><option value="proceso">En Proceso</option><option value="ruta">En Ruta</option><option value="entregado">Entregado</option><option value="cancelado">Cancelado</option></select></div>
+                           <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Pago</label><select className={`w-full border rounded-lg p-2 text-xs font-bold ${o.paymentStatus==='pagado'?'bg-green-50 text-green-700':'bg-red-50 text-red-600'}`} value={o.paymentStatus} onChange={async(e)=>{await getCollection('orders').doc(o.id).update({paymentStatus:e.target.value})}}><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option></select></div>
+                        </div>
+                        <div className="space-y-2 border-t pt-4">{o.cart.map((i,k)=>(<div key={k} className="flex justify-between text-sm"><span className="text-slate-700">{i.qty}x {i.name} {i.variantName&&`(${i.variantName})`}</span><span className="font-bold">{formatMoney(i.price*i.qty)}</span></div>))}</div>
+                        <div className="bg-slate-50 p-4 rounded-xl text-sm space-y-1">
+                           {o.discountAmount>0 && <div className="flex justify-between text-green-600"><span>Desc</span><span>-{formatMoney(o.discountAmount)}</span></div>}
+                           <div className="flex justify-between text-slate-500"><span>IVA</span><span>{formatMoney(o.tax||0)}</span></div>
+                           <div className="flex justify-between font-black text-xl text-slate-900 border-t pt-2 mt-1"><span>Total</span><span>{formatMoney(o.total)}</span></div>
+                        </div>
+                        
+                        {/* BOTONES DE ACCIÓN RESTAURADOS */}
+                        <div className="flex gap-2">
+                            <button onClick={()=>{
+                                const msg = `Hola *${o.client}*. Actualización pedido *${o.displayId}*:\nEstado: *${o.status.toUpperCase()}*\n🔗 Rastreo: ${window.location.origin}${window.location.pathname}?track=${o.displayId}`;
+                                window.open(`https://wa.me/505${o.phone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`);
+                            }} className="flex-1 btn btn-primary bg-green-500 hover:bg-green-600 shadow-none gap-2"><Icon name="message-circle" size={18}/> WhatsApp</button>
+                            
+                            <button onClick={()=>{
+                                const url = `${window.location.origin}${window.location.pathname}?track=${o.displayId}`;
+                                navigator.clipboard.writeText(url).then(() => Swal.fire({toast:true, title:"Enlace copiado", icon:"success", timer:1000, position:'top', showConfirmButton:false}));
+                            }} className="btn bg-slate-100 text-slate-600 hover:bg-slate-200"><Icon name="link" size={18}/></button>
+                        </div>
+                     </div>
+                  </div>
+               </div>
+             );
+          })()}
+
           {selProd && (
             <div className="fixed inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-enter">
                <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl">
