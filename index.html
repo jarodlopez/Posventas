@@ -3,21 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Homemart POS - Enterprise</title>
+  <title>Homemart Nicaragua </title>
   <meta name="theme-color" content="#4338ca">
 
   <!-- ==========================================
-       LIBRERÍAS
+       LIBRERÍAS (Versiones Estables y Probadas)
        ========================================== -->
+  <!-- Estilos y Diseño -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Iconografía -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Alertas Bonitas -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <!-- Motor de Reportes (Excel) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Motor de Reportes (PDF) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- React (Motor de Interfaz) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase (Base de Datos en Tiempo Real) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -37,6 +47,7 @@
 
     #root { height: 100%; display: flex; flex-direction: column; }
 
+    /* Scrollbars invisibles para sensación nativa */
     .scroll-area {
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
@@ -45,6 +56,7 @@
     }
     .scroll-area::-webkit-scrollbar { display: none; }
     
+    /* Inputs Estilizados */
     .input-field {
       width: 100%; background: white; border: 1px solid #cbd5e1; border-radius: 0.75rem;
       padding: 0.75rem 1rem; font-size: 0.95rem; outline: none; transition: all 0.2s;
@@ -52,6 +64,7 @@
     }
     .input-field:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
 
+    /* Botones Interactivos */
     .btn {
       display: flex; align-items: center; justify-content: center; gap: 0.5rem;
       font-weight: 700; padding: 0.85rem 1.5rem; border-radius: 0.75rem;
@@ -60,12 +73,18 @@
     .btn:active { transform: scale(0.96); }
     .btn-primary { background: #4f46e5; color: white; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3); }
     
+    /* Animaciones de Entrada */
     @keyframes enter { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .animate-enter { animation: enter 0.3s ease-out forwards; }
     
+    /* Menú Lateral (Drawer) */
     .drawer { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
     .drawer-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; }
-    .drawer-content { position: absolute; top: 0; left: 0; bottom: 0; width: 80%; max-width: 300px; background: white; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); pointer-events: auto; display: flex; flex-direction: column; }
+    .drawer-content { 
+        position: absolute; top: 0; left: 0; bottom: 0; width: 85%; max-width: 320px; 
+        background: white; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        pointer-events: auto; display: flex; flex-direction: column; box-shadow: 10px 0 25px rgba(0,0,0,0.1);
+    }
     .drawer.open { pointer-events: auto; }
     .drawer.open .drawer-overlay { opacity: 1; }
     .drawer.open .drawer-content { transform: translateX(0); }
@@ -75,6 +94,9 @@
   <div id="root"></div>
 
   <script type="text/babel">
+    // ==================================================================================
+    // 1. CONFIGURACIÓN DE FIREBASE (NO MODIFICAR)
+    // ==================================================================================
     const firebaseConfig = {
       apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
       authDomain: "posdeventas-a03ca.firebaseapp.com",
@@ -87,19 +109,31 @@
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
-    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'pos-pro-mobile-v2';
+    
+    // Identificador de App (Mantiene tus datos seguros)
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'pos-pro-enterprise-v1';
+    
+    // Función helper para acortar rutas de Firestore
     const getCollection = (name) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(name);
 
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useRef } = React;
 
+    // ==================================================================================
+    // 2. COMPONENTES DE UI (ICONOS Y UTILIDADES)
+    // ==================================================================================
     const Icon = ({ name, size = 20, className = "" }) => {
       useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
       return <i data-lucide={name} width={size} height={size} className={className}></i>;
     };
 
-    const formatMoney = (amount) => new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'NIO' }).format(amount).replace('NIO', 'C$');
+    const formatMoney = (amount) => {
+        if(isNaN(amount)) return 'C$ 0.00';
+        return new Intl.NumberFormat('es-NI', { style: 'currency', currency: 'NIO' }).format(amount).replace('NIO', 'C$');
+    };
 
-    // --- TRACKING VIEW ---
+    // ==================================================================================
+    // 3. VISTA DE RASTREO (CLIENTE PÚBLICO)
+    // ==================================================================================
     const TrackingView = ({ trackId }) => {
       const [order, setOrder] = useState(null);
       const [loading, setLoading] = useState(true);
@@ -132,6 +166,7 @@
            </div>
            
            <div className="px-5 -mt-12 flex-1 scroll-area pb-10">
+              {/* Tarjeta de Estado */}
               <div className="bg-white rounded-2xl shadow-lg p-6 mb-4 animate-enter">
                  <div className="flex justify-between items-center mb-4">
                     <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estado</span>
@@ -145,8 +180,9 @@
                  </div>
               </div>
 
+              {/* Tarjeta de Detalle */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 animate-enter">
-                 <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4 border-b pb-2"><Icon name="shopping-bag" size={18} className="text-indigo-600"/> Resumen</h3>
+                 <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-4 border-b pb-2"><Icon name="shopping-bag" size={18} className="text-indigo-600"/> Resumen de Compra</h3>
                  <div className="space-y-3 mb-4">
                     {order.cart?.map((item, idx) => (
                        <div key={idx} className="flex justify-between items-start text-sm">
@@ -165,8 +201,9 @@
                     {order.isDelivery && <div className="flex justify-between text-indigo-600 font-bold"><span>Envío</span><span>{formatMoney(order.shipCost)}</span></div>}
                     <div className="flex justify-between text-xl font-black text-slate-900 border-t pt-2 mt-2"><span>Total</span><span>{formatMoney(order.total)}</span></div>
                  </div>
+
                  <div className="text-center pt-2 border-t border-slate-100">
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Entregar a:</p>
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Información de Entrega:</p>
                     <p className="text-sm font-bold text-slate-800">{order.client || 'Cliente'}</p>
                     <p className="text-xs text-slate-500">{order.isDelivery ? order.address : 'Retiro en Sucursal'}</p>
                  </div>
@@ -176,77 +213,147 @@
       );
     };
 
-    // --- LOGIN ---
+    // ==================================================================================
+    // 4. PANTALLA DE LOGIN
+    // ==================================================================================
     const LoginScreen = () => {
       const [email, setEmail] = useState("");
       const [pass, setPass] = useState("");
       const [error, setError] = useState("");
       const [loading, setLoading] = useState(false);
+
       const doLogin = async (e) => {
          e.preventDefault(); setLoading(true); setError("");
          try { await auth.signInWithEmailAndPassword(email, pass); }
-         catch(e) { setError("Credenciales incorrectas"); setLoading(false); }
+         catch(e) { setError("Credenciales incorrectas o usuario no encontrado."); setLoading(false); }
       };
+
       return (
          <div className="h-full flex items-center justify-center bg-slate-900 px-4">
             <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-8 animate-enter">
-               <div className="text-center mb-8"><div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-700"><Icon name="store" size={32}/></div><h1 className="text-3xl font-black text-slate-800 tracking-tighter">HOMEMART</h1><p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Acceso Administrativo</p></div>
+               <div className="text-center mb-8">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-indigo-700"><Icon name="store" size={32}/></div>
+                  <h1 className="text-3xl font-black text-slate-800 tracking-tighter">HOMEMART</h1>
+                  <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Acceso Administrativo</p>
+               </div>
                <form onSubmit={doLogin} className="space-y-4">
-                  <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Usuario</label><input type="email" className="input-field mt-1" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
+                  <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Correo Electrónico</label><input type="email" className="input-field mt-1" value={email} onChange={e=>setEmail(e.target.value)} required /></div>
                   <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Contraseña</label><input type="password" className="input-field mt-1" value={pass} onChange={e=>setPass(e.target.value)} required /></div>
                   {error && <div className="bg-red-50 text-red-500 text-xs font-bold p-3 rounded-lg flex items-center gap-2"><Icon name="alert-triangle" size={16}/> {error}</div>}
-                  <button disabled={loading} className="btn btn-primary w-full py-4 text-lg mt-2">{loading ? '...' : 'INICIAR SESIÓN'}</button>
+                  <button disabled={loading} className="btn btn-primary w-full py-4 text-lg mt-2">{loading ? 'Verificando...' : 'INICIAR SESIÓN'}</button>
                </form>
             </div>
          </div>
       );
     };
 
-    // --- ADMIN MODULE ---
+    // ==================================================================================
+    // 5. MÓDULO DE ADMINISTRACIÓN (TURNOS Y REPORTES)
+    // ==================================================================================
     const AdminModule = ({ user, shift, updateShift }) => {
        const [tab, setTab] = useState('shift'); 
        const [startAmt, setStartAmt] = useState("");
        const [d1, setD1] = useState(new Date().toISOString().slice(0,10));
        const [d2, setD2] = useState(new Date().toISOString().slice(0,10));
 
-       const openS = async () => { if(startAmt) { await getCollection('shifts').add({userId:user.uid, startAmount:parseFloat(startAmt), openedAt: firebase.firestore.FieldValue.serverTimestamp(), status:'open'}); updateShift(); Swal.fire("Caja Abierta", "", "success"); }};
-       const closeS = async () => { if((await Swal.fire({title:'¿Cerrar Turno?', icon:"warning", showCancelButton:true, confirmButtonColor:"#ef4444"})).isConfirmed) { await getCollection('shifts').doc(shift.id).update({status:'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp()}); updateShift(); Swal.fire("Turno Cerrado", "", "success"); }};
+       // Abrir Turno
+       const openS = async () => { 
+           if(startAmt && parseFloat(startAmt) >= 0) { 
+               await getCollection('shifts').add({userId:user.uid, startAmount:parseFloat(startAmt), openedAt: firebase.firestore.FieldValue.serverTimestamp(), status:'open'}); 
+               updateShift(); 
+               Swal.fire("Caja Abierta", "El turno ha comenzado.", "success"); 
+           } else {
+               Swal.fire("Error", "Ingresa un monto válido", "error");
+           }
+       };
+
+       // Cerrar Turno
+       const closeS = async () => { 
+           if((await Swal.fire({title:'¿Cerrar Turno?', text:"No podrás vender hasta abrir uno nuevo.", icon:"warning", showCancelButton:true, confirmButtonColor:"#ef4444"})).isConfirmed) { 
+               await getCollection('shifts').doc(shift.id).update({status:'closed', closedAt: firebase.firestore.FieldValue.serverTimestamp()}); 
+               updateShift(); 
+               Swal.fire("Turno Cerrado", "Caja finalizada.", "success"); 
+           }
+       };
+       
+       // Generar Reporte
        const report = async (type) => {
           try {
-             const sd = new Date(d1); const ed = new Date(d2); ed.setHours(23,59,59,999);
-             const snap = await getCollection('orders').where('createdAt','>=',sd.toISOString()).where('createdAt','<=',ed.toISOString()).get();
-             const data = snap.docs.map(d=>{const x=d.data(); return [x.displayId, new Date(x.createdAt).toLocaleDateString(), x.client || 'Anon', x.method, x.total.toFixed(2)]});
-             if(data.length===0) return Swal.fire("Sin datos", "", "info");
-             if(type==='pdf') { const doc = new window.jspdf.jsPDF(); doc.text(`Reporte: ${d1} a ${d2}`, 14, 20); doc.autoTable({head:[['ID','Fecha','Cliente','Método','Total']], body:data, startY:30}); doc.save(`ventas.pdf`); } 
-             else { const ws = XLSX.utils.aoa_to_sheet([['ID','Fecha','Cliente','Método','Total'], ...data]); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Ventas"); XLSX.writeFile(wb, `ventas.xlsx`); }
-          } catch(e) { console.error(e); Swal.fire("Error", "Error al generar reporte", "error"); }
+             // Lógica robusta de fechas (Inicio 00:00 - Fin 23:59)
+             const sd = new Date(d1); 
+             const ed = new Date(d2); 
+             ed.setHours(23,59,59,999);
+
+             const snap = await getCollection('orders')
+                .where('createdAt','>=',sd.toISOString())
+                .where('createdAt','<=',ed.toISOString())
+                .get();
+             
+             // Mapeo seguro de datos
+             const data = snap.docs.map(d=>{
+                 const x=d.data(); 
+                 return [x.displayId, new Date(x.createdAt).toLocaleDateString(), x.client || 'Anonimo', x.method, x.total.toFixed(2)]
+             });
+
+             if(data.length===0) return Swal.fire("Sin datos", "No se encontraron ventas en este rango.", "info");
+
+             if(type==='pdf') { 
+                 const { jsPDF } = window.jspdf;
+                 const doc = new jsPDF(); 
+                 doc.text(`Reporte de Ventas: ${d1} a ${d2}`, 14, 20); 
+                 doc.autoTable({head:[['ID','Fecha','Cliente','Método','Total']], body:data, startY:30}); 
+                 doc.save(`ventas_${d1}.pdf`); 
+             } else { 
+                 const ws = XLSX.utils.aoa_to_sheet([['ID','Fecha','Cliente','Método','Total'], ...data]); 
+                 const wb=XLSX.utils.book_new(); 
+                 XLSX.utils.book_append_sheet(wb, ws, "Ventas"); 
+                 XLSX.writeFile(wb, `ventas_${d1}.xlsx`); 
+             }
+          } catch(e) { console.error(e); Swal.fire("Error", "Error al generar el reporte. Verifica la consola.", "error"); }
        };
 
        return (
           <div className="flex flex-col h-full bg-slate-50">
              <div className="p-4 bg-white border-b flex justify-center shrink-0">
-                 <div className="bg-slate-100 p-1 rounded-xl flex">
+                 <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
                      <button onClick={()=>setTab('shift')} className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${tab==='shift'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Control Caja</button>
                      <button onClick={()=>setTab('reports')} className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${tab==='reports'?'bg-white shadow text-indigo-600':'text-slate-500'}`}>Reportes</button>
                  </div>
              </div>
+             
              <div className="scroll-area p-6 flex flex-col items-center justify-start pt-10">
                 {tab === 'shift' && (
                    <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm text-center border border-slate-200 animate-enter">
                       <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${shift?'bg-green-100 text-green-600':'bg-slate-100 text-slate-400'}`}><Icon name={shift?'unlock':'lock'} size={32}/></div>
                       <h2 className="text-2xl font-bold mb-2 text-slate-800">{shift?'Turno Activo':'Caja Cerrada'}</h2>
-                      {shift ? (<div className="space-y-6"><div className="bg-slate-50 p-4 rounded-xl border border-slate-200"><p className="text-xs font-bold text-slate-400 uppercase">Fondo Inicial</p><p className="text-3xl font-black text-slate-800">{formatMoney(shift.startAmount)}</p></div><button onClick={closeS} className="w-full btn btn-primary bg-red-500 hover:bg-red-600 shadow-red-200"><Icon name="lock" size={18}/> CERRAR TURNO</button></div>) 
-                      : (<div className="space-y-4"><div className="relative"><span className="absolute left-4 top-3.5 text-slate-400 font-bold">C$</span><input type="number" className="w-full bg-slate-50 pl-10 pr-4 py-3 rounded-xl border-2 border-slate-200 outline-none text-xl font-bold text-center" placeholder="0.00" value={startAmt} onChange={e => setStartAmt(e.target.value)} /></div><button onClick={openS} disabled={!startAmt} className="btn btn-primary w-full py-3.5">ABRIR TURNO</button></div>)}
+                      <p className="text-sm text-slate-400 mb-6">{shift ? 'El sistema está habilitado para ventas.' : 'Debes abrir caja para comenzar a vender.'}</p>
+                      {shift ? (
+                          <div className="space-y-6">
+                              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                  <p className="text-xs font-bold text-slate-400 uppercase">Fondo Inicial</p>
+                                  <p className="text-3xl font-black text-slate-800">{formatMoney(shift.startAmount)}</p>
+                              </div>
+                              <button onClick={closeS} className="w-full btn btn-primary bg-red-500 hover:bg-red-600 shadow-red-200"><Icon name="lock" size={18}/> CERRAR TURNO</button>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              <div className="relative"><span className="absolute left-4 top-3.5 text-slate-400 font-bold">C$</span><input type="number" className="w-full bg-slate-50 pl-10 pr-4 py-3 rounded-xl border-2 border-slate-200 outline-none text-xl font-bold text-center" placeholder="0.00" value={startAmt} onChange={e => setStartAmt(e.target.value)} /></div>
+                              <button onClick={openS} disabled={!startAmt} className="btn btn-primary w-full py-3.5">ABRIR TURNO</button>
+                          </div>
+                      )}
                    </div>
                 )}
                 {tab === 'reports' && (
                    <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 space-y-6 animate-enter">
-                      <div className="flex items-center gap-3 text-indigo-700 font-bold text-lg border-b pb-4"><div className="p-2 bg-indigo-50 rounded-lg"><Icon name="file-text" size={24}/></div> Exportar Ventas</div>
+                      <div className="flex items-center gap-3 text-indigo-700 font-bold text-lg border-b pb-4"><div className="p-2 bg-indigo-50 rounded-lg"><Icon name="file-text" size={24}/></div> Exportar Datos</div>
                       <div className="space-y-4">
                           <div><label className="text-xs font-bold text-slate-400 uppercase ml-1">Fecha Inicio</label><input type="date" className="input-field mt-1" value={d1} onChange={e=>setD1(e.target.value)}/></div>
                           <div><label className="text-xs font-bold text-slate-400 uppercase ml-1">Fecha Fin</label><input type="date" className="input-field mt-1" value={d2} onChange={e=>setD2(e.target.value)}/></div>
                       </div>
-                      <div className="flex gap-3 pt-4"><button onClick={()=>report('pdf')} className="flex-1 btn btn-primary bg-red-500 hover:bg-red-600 text-xs shadow-red-200"><Icon name="file" size={16}/> PDF</button><button onClick={()=>report('excel')} className="flex-1 btn btn-primary bg-green-600 hover:bg-green-700 text-xs shadow-green-200"><Icon name="sheet" size={16}/> Excel</button></div>
+                      <div className="flex gap-3 pt-4">
+                          <button onClick={()=>report('pdf')} className="flex-1 btn btn-primary bg-red-500 hover:bg-red-600 text-xs shadow-red-200"><Icon name="file" size={16}/> PDF</button>
+                          <button onClick={()=>report('excel')} className="flex-1 btn btn-primary bg-green-600 hover:bg-green-700 text-xs shadow-green-200"><Icon name="sheet" size={16}/> Excel</button>
+                      </div>
                    </div>
                 )}
              </div>
@@ -254,7 +361,127 @@
        );
     };
 
-    // --- APP ---
+    // ==================================================================================
+    // 6. MODAL CHECKOUT ROBUSTO (EVITA PANTALLA BLANCA)
+    // ==================================================================================
+    const CheckoutModal = ({ cart, totals, onClose, onSuccess, shift }) => {
+       const [client, setClient] = useState("");
+       const [phone, setPhone] = useState("");
+       const [method, setMethod] = useState("Efectivo");
+       const [isDel, setIsDel] = useState(false);
+       const [addr, setAddr] = useState("");
+       const [ship, setShip] = useState(0);
+       const [paid, setPaid] = useState("");
+       const [loading, setLoading] = useState(false);
+       
+       const user = auth.currentUser;
+       const finalTotal = totals.total + (isDel ? Number(ship) : 0);
+       const change = Number(paid) - finalTotal;
+
+       const confirm = async () => {
+          setLoading(true);
+          try {
+             // VALIDACIÓN CRÍTICA: Asegurar que existan datos antes de guardar
+             const shiftId = shift ? shift.id : 'closed_shift';
+             const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+             const ref = getCollection('counters').doc('orders_'+dateStr);
+             
+             let seq = 1;
+             await db.runTransaction(async t => {
+                const doc = await t.get(ref);
+                if(doc.exists) { seq = doc.data().val + 1; t.update(ref, {val:seq}); } 
+                else { t.set(ref, {val:1}); }
+             });
+             
+             const oid = `HM-${dateStr}-${String(seq).padStart(3,'0')}`;
+
+             const orderData = {
+                displayId: oid, 
+                createdAt: new Date().toISOString(), 
+                cart, 
+                client: client || 'Cliente General', 
+                phone: phone || '', 
+                method, 
+                isDelivery: isDel, 
+                address: isDel?addr:'', 
+                shipCost: Number(ship),
+                subtotal: totals.subtotal, 
+                discountAmount: totals.discAmt, 
+                tax: totals.tax, 
+                taxRate: totals.taxOn?0.15:0, 
+                total: finalTotal,
+                status: 'recibido', 
+                paymentStatus: (method==='Efectivo' && Number(paid)>=finalTotal)?'pagado':'pendiente',
+                seller: user ? user.email : 'system', 
+                shiftId: shiftId, 
+                paidAmount: Number(paid), 
+                change: method==='Efectivo'?change:0
+             };
+
+             // Guardar Orden
+             await getCollection('orders').doc(oid).set(orderData);
+
+             // Actualizar Stock (Seguro)
+             for (const item of cart) {
+                const r = getCollection('products').doc(item.id);
+                if(!item.isVariant) {
+                    await r.update({stock: firebase.firestore.FieldValue.increment(-item.qty)});
+                } else {
+                    await db.runTransaction(async t=>{ 
+                        const d = await t.get(r); 
+                        if(!d.exists) return; 
+                        const vars = d.data().variants || []; 
+                        const nv = vars.map(v => v.name === item.variantName ? {...v, stock: Math.max(0, Number(v.stock)-item.qty)} : v); 
+                        t.update(r, {variants: nv}); 
+                    });
+                }
+             }
+
+             const link = `${window.location.origin}${window.location.pathname}?track=${oid}`;
+             const msg = `Hola *${client}*, pedido *${oid}* confirmado.\n💰 Total: ${formatMoney(finalTotal)}\n🔗 Rastreo: ${link}`;
+             
+             if(phone) {
+                 window.open(`https://wa.me/505${phone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
+             }
+             
+             Swal.fire({title:'Venta Exitosa', icon:'success', timer:1500, showConfirmButton:false});
+             onSuccess(); // Limpia carrito y cierra modal
+
+          } catch(e) {
+             console.error("Error Checkout:", e);
+             Swal.fire('Error Critico', 'No se pudo guardar la venta. Revisa tu conexión.', 'error');
+          }
+          setLoading(false);
+       };
+
+       return (
+          <div className="fixed inset-0 z-[80] bg-white md:bg-black/50 md:flex md:items-center md:justify-center animate-enter">
+             <div className="bg-white w-full h-full md:h-auto md:max-w-lg md:rounded-2xl flex flex-col overflow-hidden shadow-2xl">
+                <div className="bg-slate-900 text-white p-4 flex justify-between items-center shrink-0"><h3 className="font-bold flex gap-2"><Icon name="wallet"/> Finalizar Venta</h3><button onClick={onClose}><Icon name="x"/></button></div>
+                <div className="scroll-area p-6 space-y-5 bg-slate-50">
+                   <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                      <div className="flex items-center gap-2 text-indigo-600 font-bold text-xs uppercase tracking-wider border-b pb-2"><Icon name="user" size={14}/> Datos Cliente</div>
+                      <input className="input-field" placeholder="Nombre Completo" value={client} onChange={e=>setClient(e.target.value)}/>
+                      <div className="grid grid-cols-2 gap-3"><input className="input-field" type="tel" placeholder="WhatsApp" value={phone} onChange={e=>setPhone(e.target.value)}/><select className="input-field" value={method} onChange={e=>setMethod(e.target.value)}><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option></select></div>
+                   </div>
+                   <div className={`p-4 rounded-xl border transition-colors ${isDel?'bg-indigo-50 border-indigo-200':'bg-white border-slate-200 shadow-sm'}`}>
+                      <div className="flex justify-between items-center"><span className="font-bold text-sm text-slate-700 flex gap-2"><Icon name="bike" size={18} className="text-indigo-600"/> Delivery / Envío</span><input type="checkbox" className="w-5 h-5 accent-indigo-600" checked={isDel} onChange={e=>setIsDel(e.target.checked)}/></div>
+                      {isDel && <div className="mt-3 space-y-3 animate-enter"><input className="input-field" placeholder="Dirección Exacta" value={addr} onChange={e=>setAddr(e.target.value)}/><div className="flex justify-between bg-white p-3 rounded-lg border border-indigo-100 items-center"><span className="text-xs font-bold text-indigo-800">Costo Envío:</span><div className="flex items-center gap-1"><span className="text-slate-400 text-xs">C$</span><input type="number" className="w-24 text-right font-bold outline-none text-slate-800" value={ship} onChange={e=>setShip(e.target.value)}/></div></div></div>}
+                   </div>
+                   <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                      {method==='Efectivo' && <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center gap-4"><div className="flex-1"><label className="text-[10px] font-bold text-slate-400 uppercase">Recibido</label><input type="number" className="w-full bg-transparent text-xl font-bold outline-none" placeholder="0.00" value={paid} onChange={e=>setPaid(e.target.value)}/></div><div className="text-right"><label className="text-[10px] font-bold text-slate-400 uppercase">Cambio</label><div className={`text-xl font-black ${change<0?'text-red-500':'text-green-600'}`}>{formatMoney(change)}</div></div></div>}
+                      <div className="text-sm space-y-2 pt-2"><div className="flex justify-between text-slate-500"><span>Subtotal Neto</span><span>{formatMoney(totals.total - totals.tax)}</span></div>{totals.taxOn && <div className="flex justify-between text-indigo-600"><span>IVA 15%</span><span>{formatMoney(totals.tax)}</span></div>}{isDel && <div className="flex justify-between text-indigo-600"><span>Envío</span><span>{formatMoney(Number(ship))}</span></div>}<div className="flex justify-between text-2xl font-black text-slate-900 border-t pt-3"><span>Total</span><span>{formatMoney(finalTotal)}</span></div></div>
+                   </div>
+                </div>
+                <div className="p-4 bg-white border-t shrink-0 pb-safe"><button onClick={confirm} disabled={loading || (method==='Efectivo' && change < -0.5)} className="btn btn-primary w-full py-4 text-lg">{loading ? 'PROCESANDO...' : 'CONFIRMAR PEDIDO'}</button></div>
+             </div>
+          </div>
+       );
+    };
+
+    // ==================================================================================
+    // 7. APLICACIÓN PRINCIPAL (INTEGRACIÓN)
+    // ==================================================================================
     const App = () => {
       const [user, setUser] = useState(null);
       const [view, setView] = useState('pos');
@@ -265,7 +492,7 @@
       const [loading, setLoading] = useState(true);
       const [menuOpen, setMenuOpen] = useState(false);
 
-      // POS
+      // Estados POS
       const [search, setSearch] = useState("");
       const [cat, setCat] = useState("");
       const [selProd, setSelProd] = useState(null);
@@ -274,13 +501,13 @@
       const [disc, setDisc] = useState(0);
       const [taxOn, setTaxOn] = useState(false);
 
-      // Inv
+      // Estados Inventario
       const [invModal, setInvModal] = useState(false);
       const [invEdit, setInvEdit] = useState(null);
       const [invForm, setInvForm] = useState({ name:'', sku:'', cat:'', img:'', price:'', stock:'', hasVars:false });
       const [invVars, setInvVars] = useState([]);
 
-      // Order Detail
+      // Estado Detalle Orden
       const [viewOrderId, setViewOrderId] = useState(null);
 
       const trackId = new URLSearchParams(window.location.search).get('track');
@@ -290,6 +517,7 @@
            if(trackId && !u) await auth.signInAnonymously();
            setUser(u);
            if(u && !trackId) {
+              // Cargar datos en tiempo real
               getCollection('products').onSnapshot(s => setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))); 
               getCollection('orders').orderBy('createdAt', 'desc').limit(50).onSnapshot(s => setOrders(s.docs.map(d => ({id:d.id, ...d.data()}))));
               checkShift(u.uid);
@@ -300,25 +528,31 @@
 
       const checkShift = async (uid) => { const s = await getCollection('shifts').where('status','==','open').where('userId','==',uid).limit(1).get(); setShift(s.empty?null:{id:s.docs[0].id, ...s.docs[0].data()}); };
 
+      // Lógica Carrito
       const addToCart = (p, v=null) => {
-         if(!shift) return Swal.fire({title: "Caja Cerrada", text: "Abre turno primero", icon: "warning"});
+         if(!shift) return Swal.fire({title: "Caja Cerrada", text: "Debes abrir turno en Administración para vender.", icon: "warning"});
          const stock = v ? Number(v.stock) : Number(p.stock);
          if(stock<=0) return Swal.fire("Agotado", "", "error");
+         
          const id = v ? `${p.id}-${v.name}` : p.id;
          const exist = cart.find(x=>x.cartId===id);
+         
          if(exist && exist.qty>=stock) return Swal.fire("Stock Máximo", "", "info");
+         
          if(exist) setCart(cart.map(x=>x.cartId===id ? {...x, qty:x.qty+1}:x));
          else setCart([...cart, {cartId:id, id:p.id, name:p.name, sku: p.sku || '', price:Number(v?v.price:p.price), isVariant:!!v, variantName:v?.name, qty:1, maxStock:stock, image:p.image}]);
       };
       
       const updateQty = (id, d) => setCart(cart.map(i=>i.cartId===id?{...i, qty:i.qty+d}:i).filter(i=>i.qty>0));
       const clearCart = () => setCart([]);
+      
       const subtotal = cart.reduce((a,b)=>a+(b.price*b.qty),0);
       const discAmt = subtotal * (disc/100);
       const base = subtotal - discAmt;
       const tax = taxOn ? base * 0.15 : 0;
       const total = base + tax;
 
+      // Filtro Productos (Nombre o SKU)
       const filteredProds = products.filter(p => {
           const s = search.toLowerCase();
           return (p.name.toLowerCase().includes(s) || (p.sku && p.sku.toLowerCase().includes(s))) && (!cat || p.category === cat);
@@ -333,6 +567,7 @@
       return (
         <div className="flex h-full w-full bg-slate-100 overflow-hidden relative">
           
+          {/* MENU LATERAL */}
           <div className={`drawer ${menuOpen ? 'open' : ''}`}>
              <div className="drawer-overlay" onClick={()=>setMenuOpen(false)}></div>
              <div className="drawer-content shadow-2xl">
@@ -375,7 +610,7 @@
                            })}
                         </div>
                      </div>
-                     <div className="absolute bottom-24 right-5 flex flex-col gap-4 z-30">
+                     <div className="absolute bottom-28 right-5 flex flex-col gap-4 z-30">
                         <button onClick={()=>setView('orders')} className="bg-orange-500 text-white p-3.5 rounded-full shadow-xl shadow-orange-200 active:scale-90 relative"><Icon name="list-ordered" size={24}/>{pendingCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{pendingCount}</span>}</button>
                         <button onClick={()=>setShowMobileCart(true)} className="bg-indigo-600 text-white p-4 rounded-full shadow-2xl shadow-indigo-300 active:scale-90 relative"><Icon name="shopping-cart" size={24}/>{cart.length > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.reduce((a,b)=>a+b.qty,0)}</span>}</button>
                      </div>
@@ -386,7 +621,6 @@
                       <div className="p-4 bg-white border-b shrink-0"><h2 className="text-xl font-bold flex gap-2 items-center"><Icon name="list"/> Órdenes</h2></div>
                       <div className="scroll-area p-4 space-y-3 pb-24">
                          {orders.map(o => (
-                            // FIX: Added onClick back to Order Card
                             <div key={o.id} onClick={()=>setViewOrderId(o.id)} className={`p-4 rounded-xl border shadow-sm flex justify-between items-center bg-white cursor-pointer active:scale-95 transition-all ${o.paymentStatus==='pendiente'?'border-l-4 border-l-red-500':''}`}>
                                <div>
                                   <div className="flex gap-2 items-center mb-1"><span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 rounded">{o.displayId}</span><span className={`text-[9px] font-bold px-1.5 rounded uppercase ${o.paymentStatus==='pagado'?'text-green-600 bg-green-50':'text-red-600 bg-red-50'}`}>{o.paymentStatus}</span></div>
@@ -421,6 +655,7 @@
              </div>
           </main>
 
+          {/* SIDEBAR CARRITO */}
           <div className={`fixed inset-y-0 right-0 w-full md:w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 flex flex-col h-full ${showMobileCart?'translate-x-0':'translate-x-full'}`}>
              <div className="p-4 border-b flex justify-between items-center bg-slate-50 shrink-0"><div className="flex items-center gap-2 font-bold text-slate-800"><Icon name="shopping-cart" className="text-indigo-600"/> <span>Carrito ({cart.length})</span></div><div className="flex gap-2"><button onClick={clearCart} className="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg">LIMPIAR</button><button onClick={()=>setShowMobileCart(false)} className="p-1.5 bg-slate-200 rounded-full"><Icon name="x" size={18}/></button></div></div>
              <div className="scroll-area p-3 space-y-3 pb-32">
@@ -450,7 +685,6 @@
 
           {showCheckout && <CheckoutModal cart={cart} totals={{subtotal, discAmt, disc, tax, taxOn, total}} onClose={()=>setShowCheckout(false)} onSuccess={()=>{clearCart(); setShowCheckout(false); setShowMobileCart(false); setDisc(0);}} shift={shift}/>}
 
-          {/* MODAL ORDER DETAIL (FIXED) */}
           {viewOrderId && (() => {
              const o = orders.find(x => x.id === viewOrderId);
              if(!o) return null;
@@ -469,14 +703,11 @@
                            <div className="flex justify-between text-slate-500"><span>IVA</span><span>{formatMoney(o.tax||0)}</span></div>
                            <div className="flex justify-between font-black text-xl text-slate-900 border-t pt-2 mt-1"><span>Total</span><span>{formatMoney(o.total)}</span></div>
                         </div>
-                        
-                        {/* BOTONES DE ACCIÓN RESTAURADOS */}
                         <div className="flex gap-2">
                             <button onClick={()=>{
                                 const msg = `Hola *${o.client}*. Actualización pedido *${o.displayId}*:\nEstado: *${o.status.toUpperCase()}*\n🔗 Rastreo: ${window.location.origin}${window.location.pathname}?track=${o.displayId}`;
                                 window.open(`https://wa.me/505${o.phone.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`);
                             }} className="flex-1 btn btn-primary bg-green-500 hover:bg-green-600 shadow-none gap-2"><Icon name="message-circle" size={18}/> WhatsApp</button>
-                            
                             <button onClick={()=>{
                                 const url = `${window.location.origin}${window.location.pathname}?track=${o.displayId}`;
                                 navigator.clipboard.writeText(url).then(() => Swal.fire({toast:true, title:"Enlace copiado", icon:"success", timer:1000, position:'top', showConfirmButton:false}));
