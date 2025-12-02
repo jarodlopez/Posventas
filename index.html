@@ -3,50 +3,80 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Homemart PRO - POS</title>
+  <title>Homemart PRO - Sistema Completo</title>
+  <meta name="description" content="Sistema POS con Inventario, Variantes y Reportes"/>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css"/>
-  <!-- SweetAlert2 -->
+  <!-- SweetAlert2 (Alertas bonitas) -->
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <!-- LIBRERÍAS PARA REPORTES (Excel y PDF) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
 
   <!-- React 18 -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Firebase v8 (Compatible con tu código anterior) -->
+  <!-- Firebase v8 (Compatibilidad) -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
   <style>
-    /* Estilo visual basado en tu referencia Clean/Inter */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+    /* Tipografía e interfaz limpia */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
     body { 
       font-family: 'Inter', system-ui, sans-serif; 
-      background-color: #f3f4f6; /* Gris claro suave */
-      color: #1f2937; /* Gris oscuro para texto */
+      background-color: #f3f4f6; /* Fondo gris suave */
+      color: #111827; /* Texto oscuro */
     }
     
     /* Utilidades */
     .scrollbar-hide::-webkit-scrollbar { display: none; }
     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-    .card { background: white; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border-radius: 0.75rem; }
     
+    /* Tarjetas y Paneles */
+    .card { 
+      background: white; 
+      border: 1px solid #e5e7eb; 
+      border-radius: 0.75rem; /* rounded-xl */
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+    
+    /* Inputs personalizados */
+    .input-clean {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 0.5rem;
+      font-size: 0.875rem;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .input-clean:focus {
+      border-color: #4f46e5;
+      box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    }
+
     /* Animaciones */
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .animate-fade { animation: fadeIn 0.3s ease-out; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    // ==== CONFIGURACIÓN FIREBASE ====
+    // ==========================================
+    // CONFIGURACIÓN DE FIREBASE Y RUTAS
+    // ==========================================
     const firebaseConfig = {
       apiKey: "AIzaSyDF374bHcODY8N0R78HE8kZpmjeGeuhniU",
       authDomain: "posdeventas-a03ca.firebaseapp.com",
@@ -56,62 +86,53 @@
       appId: "1:975141670948:web:e58ed3da11878ecfdf88b1"
     };
 
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const auth = firebase.auth();
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
-    // ==== GESTIÓN DE RUTAS (CRÍTICO PARA VER TUS DATOS) ====
-    // Usamos __app_id del entorno si existe, o un default.
-    // Esto asegura que leemos la MISMA carpeta que tu archivo anterior.
+    // RUTA MAESTRA (Mantiene compatibilidad con tus datos anteriores)
     const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'pos-pro-mobile-v2';
-    
-    // Helper para apuntar siempre a la ruta correcta: artifacts/{appId}/public/data/{collection}
-    const getCol = (colName) => {
-        return db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(colName);
-    };
+    const getCollection = (colName) => db.collection('artifacts').doc(APP_ID).collection('public').doc('data').collection(colName);
 
     auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
-    // ==== COMPONENTES UI MEJORADOS ====
-    const Icon = ({ name, size = 18, className="" }) => {
-      const icons = {
+    // ==========================================
+    // COMPONENTES UI REUTILIZABLES
+    // ==========================================
+    const Icon = ({ name, size = 16, className="" }) => {
+      const map = {
         cart: "fa-cart-shopping", box: "fa-box", history: "fa-clock-rotate-left",
-        chart: "fa-chart-pie", lock: "fa-lock", unlock: "fa-lock-open", plus: "fa-plus",
-        trash: "fa-trash-can", search: "fa-magnifying-glass", whatsapp: "fa-whatsapp",
-        money: "fa-money-bill-1", truck: "fa-truck-fast", user: "fa-user", logout: "fa-right-from-bracket",
-        menu: "fa-bars", close: "fa-xmark", check: "fa-check"
+        chart: "fa-chart-line", lock: "fa-lock", unlock: "fa-lock-open", plus: "fa-plus",
+        trash: "fa-trash-can", search: "fa-magnifying-glass", money: "fa-money-bill-wave",
+        logout: "fa-right-from-bracket", edit: "fa-pen-to-square", close: "fa-xmark",
+        fileExcel: "fa-file-excel", filePdf: "fa-file-pdf", fileCsv: "fa-file-csv",
+        filter: "fa-filter", check: "fa-check", user: "fa-user"
       };
-      return <i className={`fa-solid ${icons[name] || 'fa-circle'} ${className}`} style={{fontSize: size}}></i>;
+      return <i className={`fa-solid ${map[name] || 'fa-circle'} ${className}`} style={{fontSize: size}}></i>;
     };
 
-    const Button = ({ children, onClick, variant = "primary", icon, disabled, className = "", full = false }) => {
-      const variants = {
-        primary: "bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm",
-        secondary: "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 shadow-sm",
-        success: "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm",
-        danger: "bg-rose-600 hover:bg-rose-700 text-white shadow-sm",
-        ghost: "hover:bg-gray-100 text-gray-600"
+    const Button = ({ children, onClick, variant = "primary", icon, disabled, className = "", full = false, size="md" }) => {
+      const styles = {
+        primary: "bg-indigo-600 hover:bg-indigo-700 text-white",
+        secondary: "bg-white hover:bg-gray-50 text-gray-700 border border-gray-300",
+        danger: "bg-rose-600 hover:bg-rose-700 text-white",
+        success: "bg-emerald-600 hover:bg-emerald-700 text-white",
       };
+      const sizes = { sm: "px-2 py-1 text-xs", md: "px-4 py-2 text-sm", lg: "px-6 py-3 text-base" };
+      
       return (
         <button onClick={onClick} disabled={disabled}
-          className={`px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${full ? 'w-full' : ''} ${className}`}>
+          className={`${styles[variant]} ${sizes[size]} ${full ? 'w-full' : ''} rounded-lg font-medium flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}>
           {icon && <Icon name={icon} />}
           {children}
         </button>
       );
     };
 
-    const Input = ({ label, ...props }) => (
-      <div className="flex flex-col gap-1.5 w-full">
-        {label && <label className="text-xs font-bold uppercase tracking-wide text-gray-500">{label}</label>}
-        <input className="w-full px-3 py-2.5 rounded-lg bg-white border border-gray-300 text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all" {...props} />
-      </div>
-    );
-
-    // ==== LOGIN (DISEÑO LIMPIO) ====
+    // ==========================================
+    // COMPONENTE: LOGIN / REGISTRO
+    // ==========================================
     const Login = () => {
       const [email, setEmail] = useState("");
       const [pass, setPass] = useState("");
@@ -120,15 +141,10 @@
 
       const handleAuth = async (e) => {
         e.preventDefault();
-        if(!email || !pass) return Swal.fire("Campos vacíos", "", "warning");
         setLoading(true);
         try {
-          if(isReg) {
-            await auth.createUserWithEmailAndPassword(email, pass);
-            Swal.fire("Cuenta creada", "Bienvenido a Homemart", "success");
-          } else {
-            await auth.signInWithEmailAndPassword(email, pass);
-          }
+          if (isReg) await auth.createUserWithEmailAndPassword(email, pass);
+          else await auth.signInWithEmailAndPassword(email, pass);
         } catch (err) {
           Swal.fire("Error", err.message, "error");
         }
@@ -136,114 +152,109 @@
       };
 
       return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gray-100">
-          <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+          <div className="card p-8 w-full max-w-sm animate-fade">
             <div className="text-center mb-6">
-              <div className="bg-indigo-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Icon name="box" size={30} className="text-indigo-600"/>
+              <div className="w-14 h-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Icon name="box" size={24} />
               </div>
               <h1 className="text-2xl font-bold text-gray-900">Homemart PRO</h1>
-              <p className="text-sm text-gray-500">{isReg ? "Crear cuenta nueva" : "Acceso al Sistema"}</p>
+              <p className="text-sm text-gray-500">{isReg ? "Crear Cuenta" : "Iniciar Sesión"}</p>
             </div>
             <form onSubmit={handleAuth} className="space-y-4">
-              <Input placeholder="admin@homemart.com" type="email" value={email} onChange={e=>setEmail(e.target.value)} />
-              <Input placeholder="Contraseña" type="password" value={pass} onChange={e=>setPass(e.target.value)} />
-              <Button full type="submit" disabled={loading}>{loading ? "Cargando..." : (isReg ? "Registrarse" : "Entrar")}</Button>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Email</label>
+                <input className="input-clean mt-1" type="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Contraseña</label>
+                <input className="input-clean mt-1" type="password" value={pass} onChange={e=>setPass(e.target.value)} required />
+              </div>
+              <Button full type="submit" disabled={loading} size="lg">
+                {loading ? "Cargando..." : (isReg ? "Registrarse" : "Entrar")}
+              </Button>
             </form>
-          
+            <button onClick={()=>setIsReg(!isReg)} className="w-full text-center mt-4 text-xs text-indigo-600 font-bold hover:underline">
+              {isReg ? "¿Ya tienes cuenta? Ingresa" : "¿Nuevo usuario? Regístrate"}
+            </button>
           </div>
         </div>
       );
     };
 
-    // ==== APLICACIÓN PRINCIPAL ====
+    // ==========================================
+    // COMPONENTE PRINCIPAL (APP)
+    // ==========================================
     function App() {
       const [user, setUser] = useState(null);
-      const [loading, setLoading] = useState(true);
       const [view, setView] = useState('pos');
-      const [products, setProducts] = useState([]);
+      const [loading, setLoading] = useState(true);
       const [shift, setShift] = useState(null);
-      
-      // Estado inicial de carga de datos
+      const [products, setProducts] = useState([]);
+
       useEffect(() => {
-        const unsubAuth = auth.onAuthStateChanged(async (u) => {
+        const unsub = auth.onAuthStateChanged(async (u) => {
           setUser(u);
           if (u) {
-            // Cargar datos iniciales
-            getCol("products").onSnapshot(s => 
-              setProducts(s.docs.map(d => ({id:d.id, ...d.data()})))
-            );
             checkShift(u.uid);
+            // Listener de productos en tiempo real
+            getCollection("products").onSnapshot(s => {
+              setProducts(s.docs.map(d => ({id:d.id, ...d.data()})));
+            });
           }
           setLoading(false);
         });
-        return unsubAuth;
+        return unsub;
       }, []);
 
       const checkShift = async (uid) => {
         try {
-          // Buscamos turnos 'open' para este usuario
-          const snap = await getCol("shifts")
-            .where("status", "==", "open")
-            .where("userId", "==", uid)
-            .get();
-            
-          if (!snap.empty) {
-            setShift({ id: snap.docs[0].id, ...snap.docs[0].data() });
-          } else {
-            setShift(null);
-          }
-        } catch (error) {
-          console.error("Error cargando caja:", error);
-          // No bloqueamos la app, solo asumimos cerrado
-          setShift(null);
-        }
+          const snap = await getCollection("shifts").where("status","==","open").where("userId","==",uid).get();
+          setShift(snap.empty ? null : {id: snap.docs[0].id, ...snap.docs[0].data()});
+        } catch(e) { console.error(e); }
       };
 
-      if (loading) return <div className="h-screen flex items-center justify-center bg-gray-50 text-indigo-600 font-bold"><Icon name="box" className="fa-spin mr-2"/> Cargando...</div>;
+      if (loading) return <div className="h-screen flex items-center justify-center text-indigo-600 font-bold"><Icon name="box" className="fa-spin mr-2"/> Cargando Sistema...</div>;
       if (!user) return <Login />;
 
       return (
         <div className="flex h-screen overflow-hidden bg-gray-100">
           {/* Sidebar Desktop */}
-          <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200">
+          <aside className="hidden md:flex w-64 bg-white border-r border-gray-200 flex-col">
             <div className="p-5 border-b border-gray-100">
-              <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2">
-                <Icon name="box" /> Homemart
-              </h1>
+              <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2"><Icon name="box"/> Homemart</h1>
               <p className="text-xs text-gray-400 mt-1 truncate">{user.email}</p>
             </div>
             <nav className="flex-1 p-4 space-y-1">
-              <NavBtn active={view==='pos'} onClick={()=>setView('pos')} icon="cart" label="Punto de Venta" />
-              <NavBtn active={view==='products'} onClick={()=>setView('products')} icon="box" label="Inventario" />
-              <NavBtn active={view==='history'} onClick={()=>setView('history')} icon="history" label="Historial" />
-              <NavBtn active={view==='shift'} onClick={()=>setView('shift')} icon="lock" label="Caja (Turno)" />
+              <NavButton active={view==='pos'} onClick={()=>setView('pos')} icon="cart" label="Vender" />
+              <NavButton active={view==='products'} onClick={()=>setView('products')} icon="box" label="Inventario" />
+              <NavButton active={view==='reports'} onClick={()=>setView('reports')} icon="chart" label="Reportes & Ventas" />
+              <NavButton active={view==='shift'} onClick={()=>setView('shift')} icon="lock" label="Caja" />
             </nav>
-            <div className="p-4 border-t border-gray-100">
-              <NavBtn onClick={()=>auth.signOut()} icon="logout" label="Cerrar Sesión" color="text-rose-600 hover:bg-rose-50" />
+            <div className="p-4 border-t">
+              <NavButton onClick={()=>auth.signOut()} icon="logout" label="Salir" variant="danger" />
             </div>
           </aside>
 
-          {/* Contenido Principal */}
+          {/* Main Content */}
           <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-            {/* Header Móvil */}
-            <header className="md:hidden bg-white border-b border-gray-200 p-4 flex justify-between items-center shadow-sm z-10">
+            <header className="md:hidden bg-white p-4 border-b flex justify-between items-center shadow-sm">
               <span className="font-bold text-indigo-600">Homemart PRO</span>
               <button onClick={()=>auth.signOut()} className="text-gray-400"><Icon name="logout"/></button>
             </header>
 
-            <div className="flex-1 overflow-auto p-4 md:p-6 pb-24 md:pb-6">
-              {view === 'pos' && <POSModule products={products} shift={shift} user={user} refreshShift={()=>checkShift(user.uid)} />}
-              {view === 'products' && <Inventory products={products} />}
-              {view === 'history' && <History />}
+            <div className="flex-1 overflow-auto p-4 md:p-6 pb-20 md:pb-6">
+              {view === 'pos' && <POSModule products={products} shift={shift} user={user} />}
+              {view === 'products' && <InventoryModule products={products} />}
+              {view === 'reports' && <ReportsModule />}
               {view === 'shift' && <ShiftModule shift={shift} user={user} onUpdate={()=>checkShift(user.uid)} />}
             </div>
 
-            {/* Bottom Nav Móvil */}
-            <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around p-2 z-20 pb-safe">
+            {/* Mobile Nav */}
+            <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t flex justify-around p-2 z-20">
               <MobileNavBtn active={view==='pos'} onClick={()=>setView('pos')} icon="cart" label="Venta" />
               <MobileNavBtn active={view==='products'} onClick={()=>setView('products')} icon="box" label="Inv" />
-              <MobileNavBtn active={view==='history'} onClick={()=>setView('history')} icon="history" label="Hist" />
+              <MobileNavBtn active={view==='reports'} onClick={()=>setView('reports')} icon="chart" label="Rep" />
               <MobileNavBtn active={view==='shift'} onClick={()=>setView('shift')} icon="lock" label="Caja" />
             </div>
           </main>
@@ -251,158 +262,142 @@
       );
     }
 
-    const NavBtn = ({ active, onClick, icon, label, color }) => (
-      <button onClick={onClick} 
-        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-indigo-50 text-indigo-600' : (color || 'text-gray-600 hover:bg-gray-50')}`}>
-        <Icon name={icon} /> {label}
+    const NavButton = ({active, onClick, icon, label, variant}) => (
+      <button onClick={onClick} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${variant === 'danger' ? 'text-rose-600 hover:bg-rose-50' : active ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
+        <Icon name={icon}/> {label}
       </button>
     );
-
-    const MobileNavBtn = ({ active, onClick, icon, label }) => (
+    const MobileNavBtn = ({active, onClick, icon, label}) => (
       <button onClick={onClick} className={`flex flex-col items-center p-2 rounded-lg ${active ? 'text-indigo-600' : 'text-gray-400'}`}>
-        <Icon name={icon} size={20} />
-        <span className="text-[10px] font-bold mt-1">{label}</span>
+        <Icon name={icon} size={20}/> <span className="text-[10px] font-bold mt-1">{label}</span>
       </button>
     );
 
-    // ==== MÓDULO POS (VENTA) ====
-    function POSModule({ products, shift, user, refreshShift }) {
+    // ==========================================
+    // MÓDULO 1: POS (PUNTO DE VENTA)
+    // ==========================================
+    function POSModule({ products, shift, user }) {
       const [cart, setCart] = useState([]);
       const [term, setTerm] = useState("");
       const [selectedProd, setSelectedProd] = useState(null);
-      const [checkoutMode, setCheckoutMode] = useState(false);
-      
-      // Si no hay caja abierta, mostrar advertencia
-      if (!shift) {
-        return (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6">
-            <div className="bg-orange-100 p-6 rounded-full mb-4 text-orange-600"><Icon name="lock" size={40}/></div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Caja Cerrada</h2>
-            <p className="text-gray-500 mb-6 max-w-sm">Debes abrir un turno de caja para poder registrar ventas y movimientos de dinero.</p>
-            <Button onClick={()=>window.location.reload()} variant="primary">Ir a Control de Caja</Button> 
-            {/* Nota: En la app real, cambiaría el view, aquí recargamos para simplificar o el usuario usa el menu */}
-          </div>
-        );
-      }
+      const [checkout, setCheckout] = useState(false);
 
+      if (!shift) return (
+        <div className="h-full flex flex-col items-center justify-center text-center">
+          <div className="w-20 h-20 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mb-4"><Icon name="lock" size={32}/></div>
+          <h2 className="text-2xl font-bold text-gray-800">Caja Cerrada</h2>
+          <p className="text-gray-500 mb-6">Debes abrir turno para vender.</p>
+        </div>
+      );
+
+      // Lógica Carrito
       const addToCart = (p, variant = null) => {
-        const stock = variant ? parseInt(variant.stock) : parseInt(p.stock);
-        if (stock <= 0) return Swal.fire("Agotado", "No hay stock disponible", "warning");
-
+        const stock = variant ? variant.stock : p.stock;
+        if (stock <= 0) return Swal.fire("Agotado", "Sin stock disponible", "warning");
+        
         const cartId = variant ? `${p.id}-${variant.name}` : p.id;
         const exists = cart.find(x => x.cartId === cartId);
-
-        if (exists && exists.qty >= stock) return Swal.fire("Stock Máximo", "No puedes agregar más", "warning");
+        
+        if (exists && exists.qty >= stock) return Swal.fire("Tope Stock", "No hay más unidades", "info");
 
         if (exists) {
           setCart(cart.map(x => x.cartId === cartId ? {...x, qty: x.qty + 1} : x));
         } else {
           setCart([...cart, {
-            cartId, id: p.id, name: p.name, 
-            variantName: variant?.name,
+            cartId, 
+            id: p.id, 
+            name: p.name, 
+            variantName: variant?.name || null,
             price: Number(variant?.price || p.price),
             cost: Number(variant?.cost || p.cost),
+            isVariant: !!variant,
             qty: 1
           }]);
         }
       };
 
-      const updateQty = (cartId, delta) => {
-        setCart(cart.map(item => {
-          if (item.cartId === cartId) {
-            const newQty = Math.max(0, item.qty + delta);
-            return {...item, qty: newQty};
-          }
-          return item;
-        }).filter(i => i.qty > 0));
+      const updateQty = (id, delta) => {
+        setCart(cart.map(i => i.cartId === id ? {...i, qty: Math.max(0, i.qty + delta)} : i).filter(i => i.qty > 0));
       };
 
-      const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+      const subtotal = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
 
-      // Render Checkout
-      if (checkoutMode) return <Checkout cart={cart} total={subtotal} onBack={()=>setCheckoutMode(false)} onClear={()=>{setCart([]); setCheckoutMode(false);}} shift={shift} user={user} />;
+      // Render CHECKOUT
+      if (checkout) return <CheckoutScreen cart={cart} total={subtotal} onBack={()=>setCheckout(false)} onClear={()=>{setCart([]); setCheckout(false)}} user={user} shift={shift} />;
 
+      // Render POS GRID
       return (
         <div className="flex flex-col lg:flex-row gap-4 h-full">
-          {/* Catálogo */}
           <div className="flex-1 flex flex-col h-full">
-            <div className="sticky top-0 bg-gray-100 pb-4 z-10">
-              <div className="relative">
-                <Icon name="search" className="absolute left-3 top-3 text-gray-400" />
-                <input 
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-300 focus:ring-2 focus:ring-indigo-500 outline-none" 
-                  placeholder="Buscar productos..." 
-                  value={term} onChange={e=>setTerm(e.target.value)} 
-                />
-              </div>
+            <div className="mb-4 relative">
+              <Icon name="search" className="absolute left-3 top-3 text-gray-400"/>
+              <input className="input-clean pl-10 py-3" placeholder="Buscar producto..." value={term} onChange={e=>setTerm(e.target.value)} autoFocus />
             </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pb-20 overflow-y-auto scrollbar-hide">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 overflow-y-auto pb-20 scrollbar-hide">
               {products.filter(p=>p.name.toLowerCase().includes(term.toLowerCase())).map(p => {
-                 const hasVars = p.variants && p.variants.length > 0;
-                 const stock = hasVars ? p.variants.reduce((a,b)=>a+parseInt(b.stock),0) : p.stock;
-                 return (
+                const hasVars = p.variants && p.variants.length > 0;
+                const totalStock = hasVars ? p.variants.reduce((a,b)=>a+Number(b.stock),0) : p.stock;
+                const minPrice = hasVars ? Math.min(...p.variants.map(v=>v.price)) : p.price;
+                
+                return (
                   <div key={p.id} onClick={()=>hasVars ? setSelectedProd(p) : addToCart(p)}
-                    className="card p-3 flex flex-col justify-between cursor-pointer hover:border-indigo-300 transition-colors active:scale-95 h-32">
+                    className="card p-3 cursor-pointer hover:border-indigo-400 transition-colors h-32 flex flex-col justify-between active:scale-95">
                     <div>
-                      <h3 className="font-bold text-gray-800 text-sm leading-tight line-clamp-2">{p.name}</h3>
-                      <p className={`text-xs mt-1 font-bold ${stock <= 5 ? 'text-rose-500' : 'text-emerald-600'}`}>
-                        {stock <= 0 ? 'AGOTADO' : `Stock: ${stock}`}
+                      <h3 className="font-bold text-gray-800 text-sm line-clamp-2">{p.name}</h3>
+                      <p className={`text-xs font-bold mt-1 ${totalStock<=0?'text-rose-500':'text-emerald-600'}`}>
+                        {totalStock <= 0 ? 'AGOTADO' : `Stock: ${totalStock}`}
                       </p>
                     </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <span className="font-bold text-indigo-700">C${Number(p.price).toFixed(2)}</span>
-                      {hasVars && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border">Opciones</span>}
+                    <div className="flex justify-between items-end">
+                      <span className="font-bold text-indigo-700">C${minPrice.toFixed(2)}</span>
+                      {hasVars && <span className="text-[10px] bg-gray-100 px-1 rounded border">Variantes</span>}
                     </div>
                   </div>
-                )
+                );
               })}
             </div>
           </div>
 
-          {/* Carrito Lateral */}
-          <div className="lg:w-80 card flex flex-col h-[40vh] lg:h-full border-t lg:border-t-0 fixed bottom-14 lg:static left-0 w-full z-20 shadow-2xl lg:shadow-sm">
-            <div className="p-3 border-b bg-gray-50 rounded-t-lg flex justify-between items-center">
+          {/* Carrito Sidebar */}
+          <div className="lg:w-80 card flex flex-col fixed bottom-14 lg:static left-0 w-full lg:h-full h-[40vh] border-t lg:border-0 z-10 shadow-2xl lg:shadow-none">
+            <div className="p-3 bg-gray-50 border-b flex justify-between items-center rounded-t-lg">
               <span className="font-bold text-gray-700 flex items-center gap-2"><Icon name="cart"/> Orden Actual</span>
               <button onClick={()=>setCart([])} className="text-xs text-rose-500 hover:underline">Limpiar</button>
             </div>
             <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-white">
-              {cart.length === 0 ? <div className="text-center text-gray-400 mt-10 text-sm">Carrito vacío</div> : 
-              cart.map(item => (
-                <div key={item.cartId} className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
-                  <div className="flex-1">
-                    <div className="font-medium text-gray-800">{item.name} <span className="text-xs text-gray-400">{item.variantName}</span></div>
-                    <div className="text-xs text-gray-500">C${item.price} x {item.qty}</div>
+              {cart.length===0 && <div className="text-center text-gray-400 mt-10 text-sm">Carrito vacío</div>}
+              {cart.map(i => (
+                <div key={i.cartId} className="flex justify-between items-center border-b border-gray-50 pb-2">
+                  <div className="flex-1 pr-2">
+                    <div className="text-sm font-medium text-gray-800 line-clamp-1">{i.name}</div>
+                    <div className="text-xs text-gray-500">{i.variantName ? i.variantName : 'Simple'} | C${i.price}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={()=>updateQty(item.cartId, -1)} className="w-6 h-6 bg-gray-100 rounded text-gray-600 font-bold">-</button>
-                    <span className="w-4 text-center text-xs font-bold">{item.qty}</span>
-                    <button onClick={()=>updateQty(item.cartId, 1)} className="w-6 h-6 bg-indigo-50 rounded text-indigo-600 font-bold">+</button>
+                    <button onClick={()=>updateQty(i.cartId, -1)} className="w-6 h-6 bg-gray-100 rounded font-bold">-</button>
+                    <span className="text-xs font-bold w-4 text-center">{i.qty}</span>
+                    <button onClick={()=>updateQty(i.cartId, 1)} className="w-6 h-6 bg-indigo-50 text-indigo-600 rounded font-bold">+</button>
                   </div>
                 </div>
               ))}
             </div>
             <div className="p-4 bg-gray-50 border-t">
-              <div className="flex justify-between text-lg font-bold text-gray-900 mb-3">
-                <span>Total</span>
-                <span>C${subtotal.toFixed(2)}</span>
-              </div>
-              <Button full variant="primary" disabled={cart.length===0} onClick={()=>setCheckoutMode(true)}>Cobrar</Button>
+              <div className="flex justify-between text-lg font-bold text-gray-900 mb-3"><span>Total</span><span>C${subtotal.toFixed(2)}</span></div>
+              <Button full disabled={cart.length===0} onClick={()=>setCheckout(true)}>Cobrar</Button>
             </div>
           </div>
 
           {/* Modal Variantes */}
           {selectedProd && (
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl max-w-xs w-full p-4 shadow-2xl">
+              <div className="bg-white rounded-xl p-4 w-full max-w-xs shadow-xl animate-fade">
                 <div className="flex justify-between mb-4">
-                  <h3 className="font-bold">{selectedProd.name}</h3>
+                  <h3 className="font-bold text-gray-800">{selectedProd.name}</h3>
                   <button onClick={()=>setSelectedProd(null)}><Icon name="close"/></button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {selectedProd.variants.map((v, i) => (
-                    <button key={i} onClick={()=>{addToCart(selectedProd, v); setSelectedProd(null)}}
-                      className="w-full flex justify-between p-3 border rounded-lg hover:bg-indigo-50 hover:border-indigo-200">
+                  {selectedProd.variants.map((v, idx) => (
+                    <button key={idx} onClick={()=>{addToCart(selectedProd, v); setSelectedProd(null)}}
+                      className="w-full flex justify-between p-3 border rounded-lg hover:bg-indigo-50">
                       <div className="text-left">
                         <div className="font-bold text-sm">{v.name}</div>
                         <div className="text-xs text-gray-500">Stock: {v.stock}</div>
@@ -418,97 +413,448 @@
       );
     }
 
-    // ==== CHECKOUT ====
-    const Checkout = ({ cart, total, onBack, onClear, shift, user }) => {
+    // ==========================================
+    // MÓDULO CHECKOUT & REDUCCIÓN STOCK
+    // ==========================================
+    const CheckoutScreen = ({ cart, total, onBack, onClear, user, shift }) => {
       const [paid, setPaid] = useState("");
-      const [method, setMethod] = useState("Efectivo");
       const [loading, setLoading] = useState(false);
-
       const change = (parseFloat(paid) || 0) - total;
 
       const processSale = async () => {
         setLoading(true);
         try {
-          const sale = {
+          const saleData = {
             date: firebase.firestore.FieldValue.serverTimestamp(),
             shiftId: shift.id,
             cashierId: user.uid,
             items: cart,
             total,
-            method,
             paidAmount: parseFloat(paid) || total,
             change: Math.max(0, change),
-            paymentStatus: "pagado"
+            method: "Efectivo" // Simplificado, puedes añadir más
           };
-          
-          // Guardar Venta en la ruta correcta
-          const ref = await getCol("sales").add(sale);
-          
-          // Actualizar Stock (Simplificado)
-          const batch = db.batch();
-          cart.forEach(item => {
-             // Nota: Para variantes complejas se necesita lógica de arrayRemove/update, 
-             // aquí reducimos el stock global por simplicidad en v8
-             const prodRef = getCol("products").doc(item.id);
-             batch.update(prodRef, { stock: firebase.firestore.FieldValue.increment(-item.qty) });
+
+          // 1. Guardar Venta
+          await getCollection("sales").add(saleData);
+
+          // 2. Reducir Stock (Lógica Robusta en Cliente)
+          // Nota: Firestore v8 Client SDK no soporta transactions robustas en Arrays fácilmente
+          // Usamos una lógica de "Read-Modify-Write" optimista.
+          const promises = cart.map(async (item) => {
+            const ref = getCollection("products").doc(item.id);
+            // Leemos el producto actual para asegurar consistencia
+            const docSnap = await ref.get();
+            if (!docSnap.exists) return;
+            const data = docSnap.data();
+
+            if (item.isVariant) {
+              // Buscar y actualizar variante específica
+              const updatedVariants = data.variants.map(v => {
+                if (v.name === item.variantName) {
+                  return { ...v, stock: Math.max(0, Number(v.stock) - item.qty) };
+                }
+                return v;
+              });
+              await ref.update({ variants: updatedVariants });
+            } else {
+              // Actualizar stock simple
+              await ref.update({ stock: firebase.firestore.FieldValue.increment(-item.qty) });
+            }
           });
-          await batch.commit();
+
+          await Promise.all(promises);
 
           Swal.fire({ title: "Venta Exitosa", text: `Cambio: C$${change.toFixed(2)}`, icon: "success", timer: 2000 });
           onClear();
-        } catch (e) {
-          Swal.fire("Error", "No se pudo procesar la venta", "error");
-          console.error(e);
+
+        } catch (error) {
+          console.error(error);
+          Swal.fire("Error", "Fallo al procesar venta", "error");
         }
         setLoading(false);
       };
 
       return (
-        <div className="h-full flex flex-col max-w-md mx-auto">
+        <div className="max-w-md mx-auto h-full flex flex-col">
           <button onClick={onBack} className="mb-4 text-gray-500 flex items-center gap-2"><Icon name="history" className="rotate-180"/> Volver</button>
           <div className="card p-6 flex-1 flex flex-col">
-            <h2 className="text-xl font-bold mb-6 text-center">Resumen de Pago</h2>
+            <h2 className="text-xl font-bold text-center mb-6">Confirmar Pago</h2>
             <div className="text-4xl font-bold text-center text-indigo-600 mb-8">C${total.toFixed(2)}</div>
             
-            <div className="space-y-4 flex-1">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 mb-2">Método de Pago</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {['Efectivo','Tarjeta','Transferencia'].map(m => (
-                    <button key={m} onClick={()=>setMethod(m)} 
-                      className={`py-2 px-1 rounded border text-xs font-bold ${method===m ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}>
-                      {m}
-                    </button>
-                  ))}
-                </div>
+            <div className="flex-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">Efectivo Recibido</label>
+              <div className="relative mt-1">
+                <span className="absolute left-3 top-3 text-gray-400 font-bold">C$</span>
+                <input type="number" className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl text-xl font-bold focus:border-indigo-500 outline-none"
+                  value={paid} onChange={e=>setPaid(e.target.value)} placeholder="0.00" autoFocus />
               </div>
-
-              {method === 'Efectivo' && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 mb-2">Monto Recibido</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-gray-400 font-bold">C$</span>
-                    <input type="number" className="w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl text-xl font-bold focus:border-indigo-500 outline-none" 
-                      value={paid} onChange={e=>setPaid(e.target.value)} placeholder="0.00" autoFocus />
-                  </div>
-                  <div className={`mt-4 p-3 rounded-lg text-center ${change >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                    <span className="text-xs uppercase font-bold">Cambio</span>
-                    <div className="text-2xl font-bold">C${change.toFixed(2)}</div>
-                  </div>
-                </div>
-              )}
+              <div className={`mt-4 p-4 rounded-xl text-center ${change >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                <div className="text-xs uppercase font-bold">Cambio</div>
+                <div className="text-2xl font-bold">C${change.toFixed(2)}</div>
+              </div>
             </div>
 
-            <Button full variant="success" className="mt-6 py-4 text-lg" 
-              disabled={loading || (method==='Efectivo' && change < 0)} onClick={processSale}>
-              {loading ? "Procesando..." : "Confirmar Venta"}
+            <Button full size="lg" disabled={loading || change < 0} onClick={processSale}>
+              {loading ? "Procesando..." : "Finalizar Venta"}
             </Button>
+          </div>
+        </div>
+      );
+    };
+
+    // ==========================================
+    // MÓDULO 2: INVENTARIO (CON VARIANTES)
+    // ==========================================
+    function InventoryModule({ products }) {
+      const [modal, setModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      // Form States
+      const [name, setName] = useState("");
+      const [hasVariants, setHasVariants] = useState(false);
+      const [price, setPrice] = useState("");
+      const [cost, setCost] = useState("");
+      const [stock, setStock] = useState("");
+      const [variants, setVariants] = useState([]); // [{name, price, cost, stock}]
+
+      const openModal = (prod = null) => {
+        if (prod) {
+          setEditing(prod);
+          setName(prod.name);
+          const isVar = prod.variants && prod.variants.length > 0;
+          setHasVariants(isVar);
+          if (isVar) {
+            setVariants(prod.variants);
+            setPrice(""); setCost(""); setStock("");
+          } else {
+            setPrice(prod.price); setCost(prod.cost); setStock(prod.stock);
+            setVariants([]);
+          }
+        } else {
+          setEditing(null);
+          setName(""); setHasVariants(false);
+          setPrice(""); setCost(""); setStock("");
+          setVariants([]);
+        }
+        setModal(true);
+      };
+
+      const addVariantRow = () => {
+        setVariants([...variants, { name: "", price: "", cost: "", stock: "" }]);
+      };
+
+      const updateVariant = (idx, field, val) => {
+        const newVars = [...variants];
+        newVars[idx][field] = val;
+        setVariants(newVars);
+      };
+
+      const removeVariant = (idx) => {
+        setVariants(variants.filter((_, i) => i !== idx));
+      };
+
+      const handleSave = async (e) => {
+        e.preventDefault();
+        try {
+          const prodData = {
+            name,
+            // Si tiene variantes, los campos simples se ignoran o se ponen en 0
+            price: hasVariants ? 0 : Number(price),
+            cost: hasVariants ? 0 : Number(cost),
+            stock: hasVariants ? 0 : Number(stock),
+            variants: hasVariants ? variants.map(v => ({
+              name: v.name,
+              price: Number(v.price),
+              cost: Number(v.cost),
+              stock: Number(v.stock)
+            })) : []
+          };
+
+          if (editing) {
+            await getCollection("products").doc(editing.id).update(prodData);
+            Swal.fire("Actualizado", "", "success");
+          } else {
+            await getCollection("products").add(prodData);
+            Swal.fire("Creado", "", "success");
+          }
+          setModal(false);
+        } catch (err) {
+          Swal.fire("Error", err.message, "error");
+        }
+      };
+
+      return (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-800">Inventario</h2>
+            <Button icon="plus" onClick={()=>openModal()}>Nuevo Producto</Button>
+          </div>
+
+          <div className="card overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs">
+                <tr>
+                  <th className="p-3">Producto</th>
+                  <th className="p-3 text-right">Precio</th>
+                  <th className="p-3 text-center">Stock</th>
+                  <th className="p-3 text-center">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {products.map(p => {
+                  const isVar = p.variants?.length > 0;
+                  const totalStock = isVar ? p.variants.reduce((a,b)=>a+Number(b.stock),0) : p.stock;
+                  return (
+                    <tr key={p.id} className="hover:bg-gray-50">
+                      <td className="p-3">
+                        <div className="font-bold text-gray-800">{p.name}</div>
+                        {isVar && <div className="text-xs text-indigo-600">{p.variants.length} variantes</div>}
+                      </td>
+                      <td className="p-3 text-right">
+                        {isVar ? 'Var.' : `C$${Number(p.price).toFixed(2)}`}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${totalStock<5?'bg-rose-100 text-rose-600':'bg-emerald-100 text-emerald-600'}`}>
+                          {totalStock}
+                        </span>
+                      </td>
+                      <td className="p-3 text-center">
+                        <button onClick={()=>openModal(p)} className="text-indigo-600 hover:text-indigo-800"><Icon name="edit"/></button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Modal Edición Completo */}
+          {modal && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+                <div className="p-4 border-b flex justify-between items-center">
+                  <h3 className="font-bold text-lg">{editing ? "Editar" : "Nuevo"} Producto</h3>
+                  <button onClick={()=>setModal(false)}><Icon name="close"/></button>
+                </div>
+                <form onSubmit={handleSave} className="p-6 overflow-y-auto space-y-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase text-gray-500">Nombre</label>
+                    <input className="input-clean" value={name} onChange={e=>setName(e.target.value)} required />
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-2 bg-indigo-50 p-3 rounded-lg border border-indigo-100">
+                    <input type="checkbox" checked={hasVariants} onChange={e=>setHasVariants(e.target.checked)} className="w-4 h-4 accent-indigo-600" />
+                    <label className="text-sm font-bold text-indigo-700">Este producto tiene variantes (Talla, Color)</label>
+                  </div>
+
+                  {!hasVariants ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                         <label className="text-xs font-bold uppercase text-gray-500">Precio Venta</label>
+                         <input type="number" className="input-clean" value={price} onChange={e=>setPrice(e.target.value)} required step="0.01"/>
+                      </div>
+                      <div>
+                         <label className="text-xs font-bold uppercase text-gray-500">Costo</label>
+                         <input type="number" className="input-clean" value={cost} onChange={e=>setCost(e.target.value)} required step="0.01"/>
+                      </div>
+                      <div>
+                         <label className="text-xs font-bold uppercase text-gray-500">Stock</label>
+                         <input type="number" className="input-clean" value={stock} onChange={e=>setStock(e.target.value)} required />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {variants.map((v, i) => (
+                        <div key={i} className="flex gap-2 items-end bg-gray-50 p-2 rounded border">
+                          <div className="flex-1">
+                             <label className="text-[10px] font-bold uppercase text-gray-400">Nombre</label>
+                             <input className="input-clean py-1 text-xs" placeholder="Ej. XL" value={v.name} onChange={e=>updateVariant(i,'name',e.target.value)} required />
+                          </div>
+                          <div className="w-20">
+                             <label className="text-[10px] font-bold uppercase text-gray-400">P. Venta</label>
+                             <input type="number" className="input-clean py-1 text-xs" placeholder="0.00" value={v.price} onChange={e=>updateVariant(i,'price',e.target.value)} required step="0.01"/>
+                          </div>
+                          <div className="w-20">
+                             <label className="text-[10px] font-bold uppercase text-gray-400">Costo</label>
+                             <input type="number" className="input-clean py-1 text-xs" placeholder="0.00" value={v.cost} onChange={e=>updateVariant(i,'cost',e.target.value)} required step="0.01"/>
+                          </div>
+                          <div className="w-16">
+                             <label className="text-[10px] font-bold uppercase text-gray-400">Stock</label>
+                             <input type="number" className="input-clean py-1 text-xs" placeholder="0" value={v.stock} onChange={e=>updateVariant(i,'stock',e.target.value)} required />
+                          </div>
+                          <button type="button" onClick={()=>removeVariant(i)} className="bg-rose-100 text-rose-600 p-2 rounded mb-0.5"><Icon name="trash"/></button>
+                        </div>
+                      ))}
+                      <Button type="button" variant="secondary" onClick={addVariantRow} size="sm" full>+ Agregar Variante</Button>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t flex gap-3">
+                    <Button type="button" variant="secondary" full onClick={()=>setModal(false)}>Cancelar</Button>
+                    <Button type="submit" full>Guardar Producto</Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ==========================================
+    // MÓDULO 3: REPORTES & EXPORTACIÓN
+    // ==========================================
+    function ReportsModule() {
+      const [sales, setSales] = useState([]);
+      const [start, setStart] = useState(new Date().toISOString().slice(0,10));
+      const [end, setEnd] = useState(new Date().toISOString().slice(0,10));
+      const [filtered, setFiltered] = useState([]);
+
+      useEffect(() => {
+        // Cargar todas las ventas (optimización: idealmente usar query en backend, pero v8 client filtra en memoria para flexibilidad simple)
+        const unsub = getCollection("sales").orderBy("date", "desc").onSnapshot(snap => {
+          const data = snap.docs.map(d => ({ 
+            id: d.id, 
+            ...d.data(), 
+            jsDate: d.data().date ? d.data().date.toDate() : new Date() 
+          }));
+          setSales(data);
+        });
+        return unsub;
+      }, []);
+
+      // Filtrar cuando cambian las fechas o los datos
+      useEffect(() => {
+        const s = new Date(start); s.setHours(0,0,0,0);
+        const e = new Date(end); e.setHours(23,59,59,999);
+        
+        const res = sales.filter(sale => {
+          const d = sale.jsDate;
+          return d >= s && d <= e;
+        });
+        setFiltered(res);
+      }, [sales, start, end]);
+
+      const totalPeriodo = filtered.reduce((sum, s) => sum + (s.total || 0), 0);
+
+      // --- Lógica de Exportación ---
+      const exportExcel = () => {
+        const data = filtered.map(s => ({
+          Fecha: s.jsDate.toLocaleDateString(),
+          Hora: s.jsDate.toLocaleTimeString(),
+          Items: s.items.length,
+          Metodo: s.method,
+          Total: s.total
+        }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+        XLSX.writeFile(wb, "Reporte_Ventas.xlsx");
+      };
+
+      const exportCSV = () => {
+        const headers = "Fecha,Hora,Items,Metodo,Total\n";
+        const rows = filtered.map(s => 
+          `${s.jsDate.toLocaleDateString()},${s.jsDate.toLocaleTimeString()},${s.items.length},${s.method},${s.total}`
+        ).join("\n");
+        const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "Reporte_Ventas.csv";
+        link.click();
+      };
+
+      const exportPDF = () => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.text("Reporte de Ventas - Homemart PRO", 14, 20);
+        doc.text(`Periodo: ${start} a ${end}`, 14, 30);
+        doc.text(`Total Generado: C$${totalPeriodo.toFixed(2)}`, 14, 40);
+
+        const tableData = filtered.map(s => [
+          s.jsDate.toLocaleDateString() + ' ' + s.jsDate.toLocaleTimeString(),
+          s.items.length,
+          s.method,
+          `C$${s.total.toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+          startY: 50,
+          head: [['Fecha', 'Cant. Items', 'Método', 'Total']],
+          body: tableData,
+        });
+
+        doc.save("Reporte_Ventas.pdf");
+      };
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-4 bg-white p-4 rounded-xl border">
+            <div className="flex gap-4 items-end">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Desde</label>
+                <input type="date" className="input-clean" value={start} onChange={e=>setStart(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase">Hasta</label>
+                <input type="date" className="input-clean" value={end} onChange={e=>setEnd(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex gap-2">
+               <Button onClick={exportPDF} variant="secondary" icon="filePdf" size="sm">PDF</Button>
+               <Button onClick={exportExcel} variant="secondary" icon="fileExcel" size="sm">Excel</Button>
+               <Button onClick={exportCSV} variant="secondary" icon="fileCsv" size="sm">CSV</Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div className="card p-4 bg-indigo-50 border-indigo-100">
+                <p className="text-xs font-bold text-indigo-500 uppercase">Ventas Filtradas</p>
+                <p className="text-2xl font-bold text-indigo-700">{filtered.length}</p>
+             </div>
+             <div className="card p-4 bg-emerald-50 border-emerald-100">
+                <p className="text-xs font-bold text-emerald-600 uppercase">Total Ingresos</p>
+                <p className="text-2xl font-bold text-emerald-800">C${totalPeriodo.toFixed(2)}</p>
+             </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs">
+                <tr>
+                  <th className="p-3">Fecha</th>
+                  <th className="p-3">Detalle</th>
+                  <th className="p-3">Pago</th>
+                  <th className="p-3 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filtered.map(s => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="p-3">
+                      <div className="font-bold text-gray-700">{s.jsDate.toLocaleDateString()}</div>
+                      <div className="text-xs text-gray-400">{s.jsDate.toLocaleTimeString()}</div>
+                    </td>
+                    <td className="p-3 text-xs text-gray-600">
+                      {s.items.map(i => `${i.qty}x ${i.name} ${i.variantName?`(${i.variantName})`:''}`).join(', ')}
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs font-bold border">{s.method}</span>
+                    </td>
+                    <td className="p-3 text-right font-bold text-gray-800">C${s.total.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       );
     }
 
-    // ==== CAJA (REPARADO Y CON RUTA CORRECTA) ====
+    // ==========================================
+    // MÓDULO 4: CAJA (TURNO)
+    // ==========================================
     const ShiftModule = ({ shift, user, onUpdate }) => {
       const [amount, setAmount] = useState("");
       const [loading, setLoading] = useState(false);
@@ -517,14 +863,14 @@
         if(!amount) return;
         setLoading(true);
         try {
-          await getCol("shifts").add({
+          await getCollection("shifts").add({
             userId: user.uid,
             startAmount: parseFloat(amount),
             openedAt: firebase.firestore.FieldValue.serverTimestamp(),
             status: "open"
           });
           onUpdate();
-          Swal.fire("Caja Abierta", "", "success");
+          Swal.fire("Turno Iniciado", "", "success");
         } catch(e) { console.error(e); }
         setLoading(false);
       };
@@ -534,13 +880,12 @@
         if(confirm.isConfirmed) {
           setLoading(true);
           try {
-             await getCol("shifts").doc(shift.id).update({
+             await getCollection("shifts").doc(shift.id).update({
                status: "closed",
-               closedAt: firebase.firestore.FieldValue.serverTimestamp(),
-               endAmount: 0 // Aquí podrías pedir el conteo final
+               closedAt: firebase.firestore.FieldValue.serverTimestamp()
              });
              onUpdate();
-             Swal.fire("Caja Cerrada", "", "success");
+             Swal.fire("Turno Cerrado", "", "success");
           } catch(e) { console.error(e); }
           setLoading(false);
         }
@@ -549,19 +894,19 @@
       if (shift) {
         return (
           <div className="max-w-md mx-auto mt-10">
-            <div className="card p-6 text-center">
+            <div className="card p-8 text-center animate-fade">
               <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Icon name="unlock" size={24}/>
               </div>
-              <h2 className="text-2xl font-bold text-gray-800">Caja Abierta</h2>
-              <p className="text-gray-500 mb-6">Iniciada el {shift.openedAt?.toDate().toLocaleTimeString()}</p>
+              <h2 className="text-2xl font-bold text-gray-800">Turno Abierto</h2>
+              <p className="text-gray-500 mb-6">Iniciada el {shift.openedAt?.toDate().toLocaleString()}</p>
               
               <div className="bg-gray-50 p-4 rounded-xl mb-6 border border-gray-100">
                 <p className="text-xs font-bold text-gray-400 uppercase">Fondo Inicial</p>
-                <p className="text-2xl font-bold text-gray-800">C${shift.startAmount}</p>
+                <p className="text-3xl font-bold text-gray-800">C${shift.startAmount}</p>
               </div>
 
-              <Button full variant="danger" onClick={closeShift} disabled={loading}>
+              <Button full variant="danger" onClick={closeShift} disabled={loading} size="lg">
                 {loading ? "Cerrando..." : "Cerrar Turno"}
               </Button>
             </div>
@@ -571,85 +916,26 @@
 
       return (
         <div className="max-w-md mx-auto mt-10">
-          <div className="card p-8 text-center">
+          <div className="card p-8 text-center animate-fade">
             <div className="w-16 h-16 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <Icon name="lock" size={24}/>
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-2">Apertura de Caja</h2>
-            <p className="text-gray-500 mb-6 text-sm">Ingresa el monto de efectivo inicial para comenzar a vender.</p>
+            <p className="text-gray-500 mb-6 text-sm">Ingresa el monto de efectivo inicial para comenzar.</p>
             
-            <div className="mb-6">
-              <label className="block text-left text-xs font-bold text-gray-500 mb-1 ml-1">MONTO INICIAL</label>
-              <div className="relative">
-                 <span className="absolute left-3 top-3 text-gray-400 font-bold">C$</span>
-                 <input type="number" className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-lg font-bold outline-none focus:border-indigo-500"
-                   value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" />
-              </div>
+            <div className="mb-6 text-left">
+              <label className="text-xs font-bold text-gray-500 uppercase">Monto Inicial (C$)</label>
+              <input type="number" className="input-clean mt-1 py-3 text-lg font-bold"
+                value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0.00" autoFocus />
             </div>
 
-            <Button full variant="primary" onClick={openShift} disabled={loading || !amount} className="py-3 text-lg">
+            <Button full onClick={openShift} disabled={loading || !amount} size="lg">
               {loading ? "Abriendo..." : "Abrir Caja"}
             </Button>
           </div>
         </div>
       );
     };
-
-    // ==== INVENTARIO ====
-    const Inventory = ({ products }) => {
-      const [modal, setModal] = useState(false);
-      // ... Lógica simplificada de inventario para no alargar el código
-      // Puedes reutilizar la lógica de agregar/editar que ya tenías pero con la UI limpia
-      return (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Inventario</h2>
-            {/* Botón funcional de agregar simplificado */}
-            <Button icon="plus" onClick={()=>Swal.fire("Función Simplificada", "Usa la versión completa para editar", "info")}>Nuevo</Button>
-          </div>
-          <div className="card overflow-hidden">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-gray-500 font-bold uppercase text-xs">
-                <tr><th className="p-3">Producto</th><th className="p-3 text-right">Precio</th><th className="p-3 text-center">Stock</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {products.map(p => (
-                   <tr key={p.id} className="hover:bg-gray-50">
-                     <td className="p-3 font-medium text-gray-800">{p.name}</td>
-                     <td className="p-3 text-right text-gray-600">C${p.price}</td>
-                     <td className="p-3 text-center"><span className={`px-2 py-1 rounded-full text-xs font-bold ${p.stock<5?'bg-red-100 text-red-600':'bg-emerald-100 text-emerald-600'}`}>{p.stock}</span></td>
-                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      );
-    };
-
-    // ==== HISTORIAL ====
-    const History = () => {
-       const [sales, setSales] = useState([]);
-       useEffect(() => {
-          getCol("sales").orderBy("date", "desc").limit(20).onSnapshot(s => setSales(s.docs.map(d=>d.data())));
-       }, []);
-       
-       return (
-         <div className="space-y-3">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Últimas Ventas</h2>
-            {sales.map((s, i) => (
-               <div key={i} className="card p-4 flex justify-between items-center">
-                  <div>
-                    <div className="font-bold text-gray-800">Venta #{s.date?.seconds}</div>
-                    <div className="text-xs text-gray-500">{new Date(s.date?.seconds * 1000).toLocaleString()}</div>
-                    <div className="text-xs text-indigo-600 font-medium mt-1">{s.items?.length} items • {s.method}</div>
-                  </div>
-                  <div className="text-right font-bold text-lg text-gray-800">C${s.total?.toFixed(2)}</div>
-               </div>
-            ))}
-         </div>
-       )
-    }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
